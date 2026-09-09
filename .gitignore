@@ -12,6 +12,7 @@ NEU-CLS.rar
 *.py[cod]
 .pytest_cache/
 .streamlit/secrets.toml
+*.egg-info/
 
 # Historical RAG material is local reference material, not part of this portfolio.
 references/ai-rag-project-docs/
