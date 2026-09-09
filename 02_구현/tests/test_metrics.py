@@ -57,11 +57,11 @@ def test_find_duplicates_detects_same_content(tmp_path) -> None:
     assert excluded[0]["excluded"] == "crazing_2.jpg"
 
 
-def test_find_near_duplicate_candidates_reports_similar_images(tmp_path) -> None:
+def test_find_near_duplicate_candidates_reports_similar_images(synthetic_raw_dir) -> None:
     from PIL import Image
 
-    first = tmp_path / "crazing_1.bmp"
-    second = tmp_path / "crazing_2.bmp"
+    first = synthetic_raw_dir / "crazing_101.bmp"
+    second = synthetic_raw_dir / "crazing_102.bmp"
     image = Image.new("L", (16, 16), color=0)
     for x in range(8, 16):
         for y in range(16):
@@ -72,8 +72,8 @@ def test_find_near_duplicate_candidates_reports_similar_images(tmp_path) -> None
     candidates = find_near_duplicate_candidates(entries)
     assert candidates == [
         {
-            "left": "crazing_1.bmp",
-            "right": "crazing_2.bmp",
+            "left": "crazing_101.bmp",
+            "right": "crazing_102.bmp",
             "left_class": "crazing",
             "right_class": "crazing",
             "hamming_distance": 0,

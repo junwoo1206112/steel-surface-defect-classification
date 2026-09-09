@@ -14,7 +14,7 @@ import numpy as np
 from PIL import Image
 
 from defect_cls.data import CLASSES, build_stratified_split, parse_class_from_filename
-from defect_cls.paths import RAW_DATA_ROOT, project_relative_path, require_raw_input
+from defect_cls.paths import RAW_DATA_ROOT, project_relative_path, require_raw_input, resolve_raw_path
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
 ARCHIVE_EXTENSIONS = {".zip", ".rar"}
@@ -144,7 +144,7 @@ def find_near_duplicate_candidates(
     """Report visually near image pairs without changing the dataset split."""
     if max_hamming_distance < 0:
         raise ValueError("max_hamming_distance must be non-negative")
-    hashes = [(entry, phash_of(Path(entry["filepath"]))) for entry in entries]
+    hashes = [(entry, phash_of(resolve_raw_path(entry["filepath"]))) for entry in entries]
     candidates = []
     for left_index, (left, left_hash) in enumerate(hashes):
         for right, right_hash in hashes[left_index + 1 :]:

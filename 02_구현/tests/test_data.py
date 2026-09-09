@@ -138,6 +138,17 @@ def test_dataset_paths_are_independent_of_current_working_directory(
     assert image.shape == (3, 200, 200)
 
 
+def test_preparation_is_independent_of_current_working_directory(
+    synthetic_raw_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    manifest_path, _, quality = run_preparation(
+        synthetic_raw_dir, tmp_path / "processed", 42, (0.7, 0.15, 0.15)
+    )
+    assert manifest_path.exists()
+    assert quality["near_duplicate_review"]["candidate_count"] >= 0
+
+
 def test_seed_artifact_directories_do_not_collide() -> None:
     first = seed_artifact_dir("baseline", 1)
     second = seed_artifact_dir("baseline", 2)
