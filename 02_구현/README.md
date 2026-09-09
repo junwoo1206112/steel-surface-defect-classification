@@ -22,7 +22,7 @@
 | 재현성 | seed 고정 재실행에서 epoch별·test 지표 완전 일치 확인 |
 | 추론 (batch=1) | 시스템 상태에 크게 좌우: 저부하 세션 CPU p50 10.4~11.7ms / GPU 1.65~1.87ms, 부하 경합 세션 CPU ~50.7ms / GPU ~6.2ms. 실행 조건을 함께 기록해야 함 |
 | 임계값 근거 | baseline val 최저 신뢰도 0.4995 → 임계값 0.60은 정답 1건을 재검토 플래그하는 보수 설정 |
-| 자동 테스트 | 57개 통과 |
+| 자동 테스트 | 62개 통과 |
 
 자세한 수치·측정 조건·한계: `docs/experiment-results.md` · 데이터 권리·중복 처리: `docs/data-governance.md` · 채용 담당자용 요약: `docs/portfolio-summary.md`
 
@@ -33,7 +33,7 @@
   src/defect_cls/     data(데이터셋·증강) model train evaluate inference benchmark preparation
   scripts/            prepare_data.py(검증·분할·EDA) confidence_scan.py(임계값 근거)
   app/demo.py         Streamlit 판단 보조 데모
-  tests/              57개 자동 테스트 (합성 fixture, 실데이터 불필요)
+  tests/              62개 자동 테스트 (합성 fixture, 실데이터 불필요)
   docs/               data-governance, experiment-results, portfolio-summary
   data/               raw(Git 제외), processed(manifest·품질보고서), artifacts(체크포인트·지표)
 ```
@@ -64,6 +64,7 @@ python -m defect_cls.evaluate --checkpoint data/artifacts/augmented/checkpoint.p
 
 # 4) 단일 이미지 추론 벤치마크 (CPU/GPU 병기)
 #    기존 benchmark.json이 있으면 --force 또는 --out이 필요하다(덮어쓰기 방지).
+#    --devices에는 사용 가능한 cpu/cuda만 지정하며, 요청 장치가 없으면 실패한다.
 python -m defect_cls.benchmark --checkpoint data/artifacts/baseline/checkpoint.pt --image <이미지> --devices cpu,cuda
 
 # 5) 임계값 근거 측정 + 보정/강건성/품질게이트 분석

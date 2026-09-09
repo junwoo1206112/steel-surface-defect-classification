@@ -57,6 +57,19 @@ def check_overwrite(out_path: Path, force: bool) -> str:
     return "blocked"
 
 
+def resolve_benchmark_devices(requested: str, cuda_available: bool) -> list[torch.device]:
+    """Resolve requested benchmark devices without silently dropping invalid targets."""
+    names = [token.strip().lower() for token in requested.split(",") if token.strip()]
+    if not names:
+        raise ValueError("at least one benchmark device is required (cpu and/or cuda)")
+    invalid = sorted(set(names) - {"cpu", "cuda"})
+    if invalid:
+        raise ValueError(f"unsupported benchmark device(s): {', '.join(invalid)}")
+    if "cuda" in names and not cuda_available:
+        raise ValueError("CUDA was requested but torch.cuda.is_available() is False")
+    return [torch.device(name) for name in names]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Single-image inference benchmark")
     parser.add_argument("--checkpoint", type=Path, required=True)
@@ -68,6 +81,11 @@ def main() -> None:
     parser.add_argument("--force", action="store_true", help="allow overwriting an existing benchmark file")
     args = parser.parse_args()
 
+    if args.warmup < 0:
+        parser.error("--warmup must be zero or greater")
+    if args.iters < 1:
+        parser.error("--iters must be at least 1")
+
     model, checkpoint = load_checkpoint(args.checkpoint)
     image_mode = checkpoint.get("config", {}).get(
         "image_mode", "L" if checkpoint.get("in_channels") == 1 else "RGB"
@@ -78,11 +96,10 @@ def main() -> None:
     else:
         tensor = torch.randn(1, input_channels, IMAGE_SIZE, IMAGE_SIZE)
 
-    requested = [token.strip().lower() for token in args.devices.split(",") if token.strip()]
-    available = {"cpu": torch.device("cpu")}
-    if torch.cuda.is_available():
-        available["cuda"] = torch.device("cuda")
-    targets = [available[name] for name in requested if name in available]
+    try:
+        targets = resolve_benchmark_devices(args.devices, torch.cuda.is_available())
+    except ValueError as exc:
+        parser.error(str(exc))
 
     results = {
         "checkpoint": str(args.checkpoint),

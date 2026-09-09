@@ -78,7 +78,7 @@ val 270장 전수 신뢰도 스캔 (`scripts/confidence_scan.py`):
 
 ## 7. 테스트
 
-- 자동 테스트 57개 통과: `python -m pytest -q -p no:cacheprovider --basetemp="$env:TEMP\opencode\pytest-tmp"`
+- 자동 테스트 62개 통과: `python -m pytest -q -p no:cacheprovider --basetemp="$env:TEMP\opencode\pytest-tmp"`
 - 참고: Windows 기본 pytest 임시폴더(`%TEMP%\pytest-of-<user>`)에 권한 오류(WinError 5)가 발생하는 환경이므로 basetemp를 지정한다.
 - 커버: 클래스 파싱(약어 포함), NEU-CLS 입력 계약(1,800장·6×300·200×200) 강제, stratified 분할 비율·결정론·분리, 증강 파이프라인 구성, 데이터셋 텐서 형상(3/1채널), manifest 경로 형식(posix·상대), 업로드 검증, 손상 이미지 처리, 예측 계약(확률 합·저신뢰 플래그), 지표 계약, 완전·근접 중복 검사, ZIP 경로 탈출 방지, 1채널 모델과 추론 텐서 형상, 변형 함수(노이즈 결정론 등).
 
