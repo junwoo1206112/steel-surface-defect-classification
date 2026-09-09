@@ -1,0 +1,102 @@
+{
+  "input": "C:\\취업 구직2\\반도체_표면_결함_탐지_포트폴리오\\02_구현\\data\\raw\\NEU-CLS\\NEU-CLS",
+  "scanned_root": "C:\\취업 구직2\\반도체_표면_결함_탐지_포트폴리오\\02_구현\\data\\raw\\NEU-CLS\\NEU-CLS",
+  "files_found": 1800,
+  "entries_kept": 1800,
+  "unique_entries": 1799,
+  "exact_duplicate_handling": {
+    "policy": "SHA-256 동일 파일은 정렬 순 첫 파일만 유지하고 나머지는 분할 전 제외(누수 방지)",
+    "excluded_count": 1,
+    "details": [
+      {
+        "kept": "Pa_101.bmp",
+        "excluded": "Pa_105.bmp",
+        "sha256": "6833002b8b7428946677f2cb4a4cb523e288619d73e923aea1fcf14903d65af2"
+      }
+    ]
+  },
+  "duplicate_hash_groups": 1,
+  "near_duplicate_review": {
+    "method": "perceptual hash (32px DCT, 8x8 low-frequency), Hamming distance <= 2; review-only, no automatic exclusion",
+    "candidate_count": 0,
+    "candidates": []
+  },
+  "anomalies": [],
+  "class_counts_raw": {
+    "crazing": 300,
+    "inclusion": 300,
+    "patches": 300,
+    "pitted_surface": 300,
+    "rolled-in_scale": 300,
+    "scratches": 300
+  },
+  "neu_contract": {
+    "enforced": true,
+    "passed": true,
+    "expected": {
+      "classes": [
+        "crazing",
+        "inclusion",
+        "patches",
+        "pitted_surface",
+        "rolled-in_scale",
+        "scratches"
+      ],
+      "total": 1800,
+      "per_class": 300,
+      "image_size": [
+        200,
+        200
+      ]
+    },
+    "violations": []
+  },
+  "seed": 42,
+  "ratios": [
+    0.7,
+    0.15,
+    0.15
+  ],
+  "eda": {
+    "distribution": {
+      "crazing": {
+        "train": 210,
+        "val": 45,
+        "test": 45
+      },
+      "inclusion": {
+        "train": 210,
+        "val": 45,
+        "test": 45
+      },
+      "patches": {
+        "train": 209,
+        "val": 45,
+        "test": 45
+      },
+      "pitted_surface": {
+        "train": 210,
+        "val": 45,
+        "test": 45
+      },
+      "rolled-in_scale": {
+        "train": 210,
+        "val": 45,
+        "test": 45
+      },
+      "scratches": {
+        "train": 210,
+        "val": 45,
+        "test": 45
+      }
+    },
+    "totals": {
+      "train": 1259,
+      "val": 270,
+      "test": 270
+    },
+    "image_sizes": {
+      "200x200": 1799
+    }
+  }
+}

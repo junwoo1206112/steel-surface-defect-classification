@@ -1,0 +1,17 @@
+# Dataset originals and local model outputs must never enter the public portfolio repository.
+NEU-CLS.rar
+02_구현/data/raw/
+02_구현/data/artifacts/
+02_구현/data/pretrained/
+02_구현/*.pt
+02_구현/*.pth
+02_구현/*.ckpt
+
+# Local/runtime files
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.streamlit/secrets.toml
+
+# Historical RAG material is local reference material, not part of this portfolio.
+references/ai-rag-project-docs/
