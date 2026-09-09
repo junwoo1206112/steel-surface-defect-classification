@@ -12,7 +12,7 @@
 ## 모델과 실험
 
 - [x] 설치 명령이 동작한다. (`pip install -e .` 통과 — 완전 새 환경 검증은 배포 시 남음)
-- [x] 데이터 로더와 클래스 매핑 테스트가 통과한다. (약어 Cr/In/Pa/PS/RS/Sc 포함 62개 테스트)
+- [x] 데이터 로더와 클래스 매핑 테스트가 통과한다. (약어 Cr/In/Pa/PS/RS/Sc 포함 72개 테스트)
 - [x] 기준 모델과 증강 모델을 같은 test set으로 평가했다. (n=270, 둘 다 Accuracy 1.0000)
 - [x] Accuracy, macro F1, 클래스별 지표, confusion matrix를 실제 생성했다. (`test-metrics.json`, `confusion-matrix.csv/png`)
 - [x] 결과가 나쁘거나 증강이 악화한 경우도 숨기지 않았다. (증강 우위 없음·수렴 지연 사실을 리포트에 명시)

@@ -78,13 +78,13 @@ val 270장 전수 신뢰도 스캔 (`scripts/confidence_scan.py`):
 
 ## 7. 테스트
 
-- 자동 테스트: 이 저장소 변경 시 전체 pytest로 검증한다. 이 문서의 기존 실측 실행 시점에는 62개가 통과했으며, 이후 회귀 테스트 수는 변경될 수 있다. 명령: `python -m pytest -q -p no:cacheprovider --basetemp="$env:TEMP\opencode\pytest-tmp"`
+- 자동 테스트: 현재 코드 기준 전체 pytest **72개 통과**. 명령: `python -m pytest -q -p no:cacheprovider --basetemp="$env:TEMP\opencode\pytest-tmp"`
 - 참고: Windows 기본 pytest 임시폴더(`%TEMP%\pytest-of-<user>`)에 권한 오류(WinError 5)가 발생하는 환경이므로 basetemp를 지정한다.
 - 커버: 클래스 파싱(약어 포함), NEU-CLS 입력 계약(1,800장·6×300·200×200) 강제, stratified 분할 비율·결정론·분리, 프로젝트 기준 manifest 경로, 업로드 파일·픽셀 제한, 안전 checkpoint 로드와 CPU smoke test, 동일 manifest SHA-256 기반 seed 결과 집계, 산출물 seed 분리, 지표 계약, 완전·근접 중복 검사, ZIP 경로 탈출 방지 등.
 
 ### 다중 seed 결과 집계 도구의 범위
 
-- `scripts/aggregate_seed_metrics.py`는 이미 측정된 `test-metrics.json`만 읽고, 각 파일의 `manifest_sha256`가 현재 manifest와 완전히 일치할 때만 Accuracy·macro F1을 요약한다.
+- `scripts/aggregate_seed_metrics.py`는 이미 측정된 `test-metrics.json`만 읽고, 각 파일의 `manifest_sha256`가 현재 manifest와 완전히 일치하는 **최소 2개 고유 seed**일 때만 Accuracy·macro F1을 요약한다. 각 지표는 `n`, `mean`, `sample_stddev`, `min`, `max`를 원시 float로 기록한다.
 - 이 도구는 학습·추론을 실행하지 않으며, 이 변경에서는 다중-seed 학습이나 새 성능 수치를 생성하지 않았다. 충분한 독립 실행 결과가 있을 때에만 그 결과와 실행 조건을 별도 기록한다.
 
 ## 8. 입력 채널 대안 비교 (grayscale1ch, 보조 실험)

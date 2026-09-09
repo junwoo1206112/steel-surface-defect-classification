@@ -37,15 +37,16 @@ def summarize_seed_metrics(metric_paths: list[str | Path], manifest_path: str | 
         if not all(isinstance(value, (int, float)) for value in metrics.values()):
             raise ValueError(f"missing numeric metrics: {path}")
         runs.append({"seed": seed, "metrics_path": path.as_posix(), **metrics})
-    if not runs:
-        raise ValueError("at least one test-metrics.json file is required")
+    if len(runs) < 2:
+        raise ValueError("at least two unique seeds are required for aggregation")
     runs.sort(key=lambda run: run["seed"])
     summary = {}
     for metric_name in ("accuracy", "macro_f1"):
         values = [run[metric_name] for run in runs]
         summary[metric_name] = {
-            "mean": round(statistics.mean(values), 6),
-            "stdev": round(statistics.stdev(values), 6) if len(values) > 1 else 0.0,
+            "n": len(values),
+            "mean": statistics.mean(values),
+            "sample_stddev": statistics.stdev(values),
             "min": min(values),
             "max": max(values),
         }

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from defect_cls.evaluate import build_metrics
 from defect_cls.preparation import (
     dedupe_entries,
@@ -17,6 +19,13 @@ def test_build_metrics_known_values() -> None:
     assert result["confusion_matrix"] == [[1, 1], [0, 2]]
     assert set(result["per_class"]) == {"a", "b"}
     assert result["num_samples"] == 4
+
+
+def test_build_metrics_preserves_unrounded_raw_floats() -> None:
+    result = build_metrics([0, 0, 0, 1, 1], [0, 0, 1, 1, 1], ["a", "b"])
+    assert result["accuracy"] == 0.8
+    assert result["macro_f1"] == 0.8
+    assert result["per_class"]["a"]["recall"] == pytest.approx(2 / 3)
 
 
 def test_build_metrics_perfect_predictions() -> None:

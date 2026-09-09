@@ -36,19 +36,19 @@ def build_metrics(targets: list[int], preds: list[int], class_names: list[str]) 
     per_class = {}
     for i, name in enumerate(class_names):
         per_class[name] = {
-            "precision": round(float(report[0][i]), 4),
-            "recall": round(float(report[1][i]), 4),
-            "f1": round(float(report[2][i]), 4),
+            "precision": float(report[0][i]),
+            "recall": float(report[1][i]),
+            "f1": float(report[2][i]),
             "support": int(report[3][i]),
         }
     confusion = metrics.confusion_matrix(
         targets, preds, labels=list(range(len(class_names)))
     )
     return {
-        "accuracy": round(float(metrics.accuracy_score(targets, preds)), 4),
-        "macro_f1": round(float(metrics.f1_score(targets, preds, average="macro", zero_division=0)), 4),
-        "macro_precision": round(float(metrics.precision_score(targets, preds, average="macro", zero_division=0)), 4),
-        "macro_recall": round(float(metrics.recall_score(targets, preds, average="macro", zero_division=0)), 4),
+        "accuracy": float(metrics.accuracy_score(targets, preds)),
+        "macro_f1": float(metrics.f1_score(targets, preds, average="macro", zero_division=0)),
+        "macro_precision": float(metrics.precision_score(targets, preds, average="macro", zero_division=0)),
+        "macro_recall": float(metrics.recall_score(targets, preds, average="macro", zero_division=0)),
         "per_class": per_class,
         "confusion_matrix": confusion.tolist(),
         "class_order": class_names,
