@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import io
-from pathlib import Path
-
 import streamlit as st
 import torch
 from PIL import Image
 
 from defect_cls import __version__
+from defect_cls.artifacts import discover_checkpoints
 from defect_cls.data import CLASSES
 from defect_cls.inference import (
     DEFAULT_THRESHOLD,
@@ -37,24 +36,27 @@ def load_model(checkpoint_path: str):
     return model, checkpoint
 
 
-def available_experiments() -> list[Path]:
-    if not ARTIFACTS_DIR.exists():
-        return []
-    return sorted(path for path in ARTIFACTS_DIR.glob("*/checkpoint.pt"))
-
-
-checkpoints = available_experiments()
+checkpoints = discover_checkpoints(ARTIFACTS_DIR)
 if not checkpoints:
     st.error(
         "학습된 모델이 없습니다. 먼저 데이터 준비와 학습을 완료하세요:\n\n"
         "1. `python scripts/prepare_data.py --input <NEU-CLS 압축파일>\n"
-        "2. `python -m defect_cls.train --experiment baseline`\n"
+        "2. `python -m defect_cls.train --experiment baseline --seed 42`\n"
         "3. `python -m defect_cls.evaluate --checkpoint data/artifacts/baseline/seed-42/checkpoint.pt`"
     )
     st.stop()
 
-experiment_names = [path.parent.name for path in checkpoints]
-selected = st.sidebar.selectbox("실험 선택", experiment_names)
+checkpoint_labels = [option.label for option in checkpoints]
+selected = st.sidebar.selectbox(
+    "실험·seed 체크포인트 선택",
+    checkpoint_labels,
+    index=None,
+    placeholder="체크포인트를 선택하세요",
+)
+if selected is None:
+    st.info("legacy 또는 seed별 체크포인트를 명시적으로 선택한 뒤 예측을 시작하세요.")
+    st.stop()
+selected_option = next(option for option in checkpoints if option.label == selected)
 threshold = st.sidebar.slider(
     "신뢰도 임계값", 0.30, 0.95, DEFAULT_THRESHOLD, 0.05,
     help="이 값보다 신뢰도가 낮으면 재검토 안내를 표시합니다.",
@@ -63,14 +65,14 @@ st.sidebar.info(
     "참고: 심하게 훼손된 입력은 신뢰도가 높게 유지되는 과신 특성이 측정으로 확인돼 "
     "임계값만으로 걸러지지 않습니다. 이 데모는 판단 보조 참고용입니다."
 )
-checkpoint_path = next(path for path in checkpoints if path.parent.name == selected)
+checkpoint_path = selected_option.path
 
 with st.sidebar:
     st.divider()
     st.subheader("실험 정보")
     st.markdown(
         f"- 앱 버전: `{__version__}`\n"
-        f"- 실험: `{selected}`\n"
+        f"- 체크포인트: `{selected_option.label}`\n"
         f"- 클래스 수: {len(CLASSES)}\n"
         f"- 임계값: {threshold:.2f}"
     )
@@ -129,7 +131,7 @@ if uploaded is not None:
 
     st.divider()
     st.caption(
-        f"모델: {selected} (epoch {checkpoint['epoch']}, seed {checkpoint['seed']}) · "
+        f"모델: {selected_option.label} (epoch {checkpoint['epoch']}, seed {checkpoint['seed']}) · "
         f"torch {checkpoint['environment']['torch']} · "
         f"device {checkpoint['environment']['device']}"
     )

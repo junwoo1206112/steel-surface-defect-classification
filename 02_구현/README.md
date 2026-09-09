@@ -22,7 +22,7 @@
 | 재현성 | seed 고정 재실행에서 epoch별·test 지표 완전 일치 확인 |
 | 추론 (batch=1) | 시스템 상태에 크게 좌우: 저부하 세션 CPU p50 10.4~11.7ms / GPU 1.65~1.87ms, 부하 경합 세션 CPU ~50.7ms / GPU ~6.2ms. 실행 조건을 함께 기록해야 함 |
 | 임계값 근거 | baseline val 최저 신뢰도 0.4995 → 임계값 0.60은 정답 1건을 재검토 플래그하는 보수 설정 |
-| 자동 테스트 | 73개 통과 (현재 코드 기준, 합성 fixture·CPU smoke test 포함) |
+| 자동 테스트 | 76개 통과 (현재 코드 기준, 합성 fixture·CPU smoke test 포함) |
 
 자세한 수치·측정 조건·한계: `docs/experiment-results.md` · 데이터 권리·중복 처리: `docs/data-governance.md` · 채용 담당자용 요약: `docs/portfolio-summary.md`
 
@@ -33,7 +33,7 @@
   src/defect_cls/     data(데이터셋·증강) model train evaluate inference benchmark preparation
   scripts/            prepare_data.py(검증·분할·EDA) confidence_scan.py(임계값 근거)
   app/demo.py         Streamlit 판단 보조 데모
-  tests/              73개 자동 테스트 (합성 fixture, 실데이터 불필요)
+  tests/              76개 자동 테스트 (합성 fixture, 실데이터 불필요)
   docs/               data-governance, experiment-results, portfolio-summary
   data/               raw(Git 제외), processed(manifest·품질보고서), artifacts(체크포인트·지표)
 ```
@@ -89,6 +89,7 @@ streamlit run app/demo.py
 - 예측 클래스와 신뢰도를 표시하며, **신뢰도가 임계값(기본 0.60) 미만이면 예측을 확정하지 않고 `판단 보조 결과 — 재검토 필요`를 표시한다.**
 - **입력 품질 게이트**: 업로드 이미지의 노이즈·밝기 지표가 실험용 임계값을 벗어나면 신뢰도와 무관하게 재검토로 표시한다. 임계값은 200×200 validation 이미지에서 탐색적으로 정한 보조 신호이므로, 임의 해상도·압축 형식 업로드의 운영 품질을 보증하지 않는다.
 - UI는 실제 검사 장비나 불량 확정 도구가 아님을 화면에 명시한다.
+- 데모는 `data/artifacts/<experiment>/checkpoint.pt`의 legacy 체크포인트와 `data/artifacts/<experiment>/seed-<seed>/checkpoint.pt`의 seed별 체크포인트를 모두 표시한다. 사용자가 라벨(실험·seed)을 명시적으로 선택하기 전에는 모델을 로드하지 않는다.
 
 ## 데이터 라이선스·인용
 
