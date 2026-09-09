@@ -15,6 +15,7 @@ from defect_cls.data import (
     train_transform,
 )
 from defect_cls.preparation import run_preparation
+from defect_cls.paths import seed_artifact_dir
 
 
 @pytest.mark.parametrize(
@@ -113,6 +114,35 @@ def test_manifest_filepaths_are_posix(synthetic_raw_dir: Path, tmp_path: Path) -
     for row in rows:
         assert "\\" not in row["filepath"]
         assert row["filepath"].replace("\\", "/") == row["filepath"]
+        assert row["filepath"].startswith("data/raw/")
+
+
+def test_preparation_rejects_input_outside_data_raw(tmp_path: Path) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    with pytest.raises(ValueError, match="data/raw"):
+        run_preparation(outside, tmp_path / "processed", 42, (0.7, 0.15, 0.15))
+
+
+def test_dataset_paths_are_independent_of_current_working_directory(
+    synthetic_raw_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manifest_path, _, _ = run_preparation(synthetic_raw_dir, tmp_path / "processed", 42, (0.7, 0.15, 0.15))
+    import csv
+
+    with open(manifest_path, newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    monkeypatch.chdir(tmp_path)
+    dataset = DefectDataset(rows, "train", eval_transform())
+    image, _ = dataset[0]
+    assert image.shape == (3, 200, 200)
+
+
+def test_seed_artifact_directories_do_not_collide() -> None:
+    first = seed_artifact_dir("baseline", 1)
+    second = seed_artifact_dir("baseline", 2)
+    assert first != second
+    assert first.as_posix().endswith("baseline/seed-1")
 
 
 def test_zip_path_traversal_is_rejected(tmp_path: Path) -> None:

@@ -20,6 +20,8 @@ from defect_cls.data import (
     train_transform,
 )
 from defect_cls.model import build_model
+from defect_cls.paths import ARTIFACTS_ROOT, PROCESSED_DATA_ROOT, resolve_project_path, seed_artifact_dir
+from defect_cls.seed_metrics import sha256_file
 
 
 def read_manifest(manifest_path: Path) -> list[dict]:
@@ -71,7 +73,7 @@ def resolve_device(requested: str) -> torch.device:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train defect classification model")
-    parser.add_argument("--manifest", type=Path, default=Path("data/processed/manifest.csv"))
+    parser.add_argument("--manifest", type=Path, default=PROCESSED_DATA_ROOT / "manifest.csv")
     parser.add_argument("--experiment", choices=["baseline", "augmented", "grayscale1ch"], required=True)
     parser.add_argument("--input-channels", type=int, choices=[1, 3], default=3)
     parser.add_argument("--epochs", type=int, default=20)
@@ -81,7 +83,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", default="auto")
-    parser.add_argument("--out-dir", type=Path, default=Path("data/artifacts"))
+    parser.add_argument("--out-dir", type=Path, default=ARTIFACTS_ROOT)
     args = parser.parse_args()
 
     augmented = args.experiment == "augmented"
@@ -91,10 +93,11 @@ def main() -> None:
     seed_everything(args.seed)
     torch.use_deterministic_algorithms(True, warn_only=True)
     device = resolve_device(args.device)
-    out_dir = args.out_dir / args.experiment
+    manifest_path = resolve_project_path(args.manifest)
+    out_dir = seed_artifact_dir(args.experiment, args.seed, args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    rows = read_manifest(args.manifest)
+    rows = read_manifest(manifest_path)
     train_set = DefectDataset(rows, "train", train_transform(augmented=augmented, image_mode=image_mode), image_mode=image_mode)
     val_set = DefectDataset(rows, "val", eval_transform(image_mode=image_mode), image_mode=image_mode)
     generator = torch.Generator().manual_seed(args.seed)
@@ -166,7 +169,8 @@ def main() -> None:
                         "input_size": 200,
                         "input_channels": args.input_channels,
                         "image_mode": image_mode,
-                        "manifest": str(args.manifest),
+                        "manifest": str(manifest_path),
+                        "manifest_sha256": sha256_file(manifest_path),
                     },
                     "environment": {
                         "torch": torch.__version__,

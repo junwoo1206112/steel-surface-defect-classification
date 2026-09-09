@@ -37,7 +37,7 @@
 ## 3. seed 고정 재실행 (재현 검증)
 
 - 동일 명령 재실행(같은 seed=42, 같은 GPU)에서 epoch별 학습/val 지표가 **모두 동일**함을 확인했다(`history.json`에서 `elapsed_seconds`만 제외하고 비교 시 완전 일치).
-- test-metrics.json도 `checkpoint` 경로 필드를 제외하면 완전 일치했다.
+- test-metrics.json도 `checkpoint` 경로 필드를 제외하면 완전 일치했다. 현재 평가는 `manifest_sha256`도 기록해, 향후 서로 다른 학습 seed의 완료된 결과를 같은 분할에서만 집계할 수 있게 한다.
 - 임시 검증 산출물(`data/artifacts/_repro_check`)은 검증 후 삭제했다.
 
 ## 4. 단일 이미지 추론 벤치마크 (batch=1)
@@ -78,9 +78,14 @@ val 270장 전수 신뢰도 스캔 (`scripts/confidence_scan.py`):
 
 ## 7. 테스트
 
-- 자동 테스트 62개 통과: `python -m pytest -q -p no:cacheprovider --basetemp="$env:TEMP\opencode\pytest-tmp"`
+- 자동 테스트: 이 저장소 변경 시 전체 pytest로 검증한다. 이 문서의 기존 실측 실행 시점에는 62개가 통과했으며, 이후 회귀 테스트 수는 변경될 수 있다. 명령: `python -m pytest -q -p no:cacheprovider --basetemp="$env:TEMP\opencode\pytest-tmp"`
 - 참고: Windows 기본 pytest 임시폴더(`%TEMP%\pytest-of-<user>`)에 권한 오류(WinError 5)가 발생하는 환경이므로 basetemp를 지정한다.
-- 커버: 클래스 파싱(약어 포함), NEU-CLS 입력 계약(1,800장·6×300·200×200) 강제, stratified 분할 비율·결정론·분리, 증강 파이프라인 구성, 데이터셋 텐서 형상(3/1채널), manifest 경로 형식(posix·상대), 업로드 검증, 손상 이미지 처리, 예측 계약(확률 합·저신뢰 플래그), 지표 계약, 완전·근접 중복 검사, ZIP 경로 탈출 방지, 1채널 모델과 추론 텐서 형상, 변형 함수(노이즈 결정론 등).
+- 커버: 클래스 파싱(약어 포함), NEU-CLS 입력 계약(1,800장·6×300·200×200) 강제, stratified 분할 비율·결정론·분리, 프로젝트 기준 manifest 경로, 업로드 파일·픽셀 제한, 안전 checkpoint 로드와 CPU smoke test, 동일 manifest SHA-256 기반 seed 결과 집계, 산출물 seed 분리, 지표 계약, 완전·근접 중복 검사, ZIP 경로 탈출 방지 등.
+
+### 다중 seed 결과 집계 도구의 범위
+
+- `scripts/aggregate_seed_metrics.py`는 이미 측정된 `test-metrics.json`만 읽고, 각 파일의 `manifest_sha256`가 현재 manifest와 완전히 일치할 때만 Accuracy·macro F1을 요약한다.
+- 이 도구는 학습·추론을 실행하지 않으며, 이 변경에서는 다중-seed 학습이나 새 성능 수치를 생성하지 않았다. 충분한 독립 실행 결과가 있을 때에만 그 결과와 실행 조건을 별도 기록한다.
 
 ## 8. 입력 채널 대안 비교 (grayscale1ch, 보조 실험)
 
@@ -99,7 +104,7 @@ val 270장 전수 신뢰도 스캔 (`scripts/confidence_scan.py`):
 ## 9. 합성 훼손(corruption) 스트레스 테스트·신뢰도 보정 스캔
 
 - 목적: 같은 데이터 분포의 이미지에 결정론적 훼손을 적용했을 때, 신뢰도 임계값이 얼마나 실패하는지 탐색.
-- 방법: baseline 모델, val 270장에 **결정론적 변형**만 적용(외부 이미지 미사용, 노이즈 시드 고정). 이는 외부 OOD·도메인 일반화 평가는 아니다. 실행: `python scripts/ood_scan.py --checkpoint data/artifacts/baseline/checkpoint.pt`
+- 방법: baseline 모델, val 270장에 **결정론적 변형**만 적용(외부 이미지 미사용, 노이즈 시드 고정). 이는 외부 OOD·도메인 일반화 평가는 아니다. 실행: `python scripts/ood_scan.py --checkpoint data/artifacts/baseline/seed-42/checkpoint.pt`
 
 | 변형 | Accuracy | 평균 신뢰도 | 최저 신뢰도 | 0.60 미만(재검토 플래그) |
 | --- | --- | --- | --- | --- |

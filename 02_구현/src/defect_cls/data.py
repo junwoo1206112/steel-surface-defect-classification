@@ -8,6 +8,8 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+from defect_cls.paths import resolve_raw_path
+
 CLASSES = (
     "crazing",
     "inclusion",
@@ -131,7 +133,7 @@ class DefectDataset(Dataset):
 
     def __getitem__(self, index: int):
         row = self.rows[index]
-        image = Image.open(row["filepath"]).convert(self.image_mode)
+        image = Image.open(resolve_raw_path(row["filepath"])).convert(self.image_mode)
         if self.transform is not None:
             image = self.transform(image)
         label = CLASS_TO_INDEX[row["class_label"]]

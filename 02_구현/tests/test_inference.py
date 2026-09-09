@@ -6,6 +6,7 @@ import torch
 from defect_cls.inference import (
     DEFAULT_THRESHOLD,
     MAX_UPLOAD_BYTES,
+    MAX_UPLOAD_PIXELS,
     load_image_tensor,
     predict,
     validate_upload,
@@ -59,6 +60,18 @@ def test_load_image_tensor_respects_grayscale_mode() -> None:
 def test_load_image_tensor_rejects_corrupt_bytes() -> None:
     with pytest.raises(ValueError):
         load_image_tensor(b"this is not an image")
+
+
+def test_load_image_tensor_rejects_excessive_pixels(monkeypatch: pytest.MonkeyPatch) -> None:
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("L", (10, 10), color=128).save(buffer, format="PNG")
+    monkeypatch.setattr("defect_cls.inference.MAX_UPLOAD_PIXELS", 50)
+    with pytest.raises(ValueError, match="too many pixels"):
+        load_image_tensor(buffer.getvalue())
 
 
 def test_predict_output_contract() -> None:

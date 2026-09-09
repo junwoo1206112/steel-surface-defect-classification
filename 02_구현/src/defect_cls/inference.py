@@ -10,6 +10,7 @@ from torchvision import transforms
 from defect_cls.data import CLASSES, CLASS_TO_INDEX, eval_transform, train_transform
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_PIXELS = 20_000_000
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
 DEFAULT_THRESHOLD = 0.60
 
@@ -47,7 +48,19 @@ def load_image_tensor(
             image = Image.open(source)
         except Exception as exc:
             raise ValueError(f"손상되었거나 이미지가 아닌 파일입니다: {exc}") from exc
-    tensor = transform(image.convert(image_mode))
+    try:
+        if image.width * image.height > MAX_UPLOAD_PIXELS:
+            raise ValueError(
+                f"image has too many pixels: {image.width}x{image.height} "
+                f"(maximum {MAX_UPLOAD_PIXELS})"
+            )
+        image.load()
+        converted = image.convert(image_mode)
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError(f"손상되었거나 이미지가 아닌 파일입니다: {exc}") from exc
+    tensor = transform(converted)
     return tensor.unsqueeze(0)
 
 

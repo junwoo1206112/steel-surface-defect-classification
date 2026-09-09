@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from defect_cls.data import DefectDataset, eval_transform
 from defect_cls.model import build_model, load_checkpoint
 from defect_cls.train import read_manifest, resolve_device
+from defect_cls.paths import PROCESSED_DATA_ROOT, resolve_project_path
 
 T_GRID = [round(0.1 * t, 1) for t in range(5, 51)]
 
@@ -48,22 +49,24 @@ def fit_temperature(logits: torch.Tensor, labels: torch.Tensor) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fit temperature scaling on validation logits")
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, default=Path("data/processed/manifest.csv"))
+    parser.add_argument("--manifest", type=Path, default=PROCESSED_DATA_ROOT / "manifest.csv")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--batch-size", type=int, default=64)
     args = parser.parse_args()
 
     device = resolve_device(args.device)
-    model, checkpoint = load_checkpoint(args.checkpoint, map_location=str(device))
+    checkpoint_path = resolve_project_path(args.checkpoint)
+    manifest_path = resolve_project_path(args.manifest)
+    model, checkpoint = load_checkpoint(checkpoint_path, map_location=str(device))
     model.to(device)
     image_mode = checkpoint.get("config", {}).get("image_mode", "RGB")
-    rows = read_manifest(args.manifest)
+    rows = read_manifest(manifest_path)
     dataset = DefectDataset(rows, "val", eval_transform(image_mode=image_mode), image_mode=image_mode)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
     logits, labels = collect_logits(model, loader, device)
     result = fit_temperature(logits, labels)
     payload = {
-        "checkpoint": str(args.checkpoint),
+        "checkpoint": str(checkpoint_path),
         "experiment": checkpoint["experiment"],
         "split": "val",
         "num_samples": int(labels.numel()),
@@ -71,7 +74,7 @@ def main() -> None:
         "device": str(device),
         **result,
     }
-    out_path = args.checkpoint.parent / "temperature.json"
+    out_path = checkpoint_path.parent / "temperature.json"
     out_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     print(
         f"best T={result['best_temperature']} "

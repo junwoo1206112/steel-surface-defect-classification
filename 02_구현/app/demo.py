@@ -17,9 +17,10 @@ from defect_cls.inference import (
 )
 from defect_cls.model import load_checkpoint
 from defect_cls.quality import assess_quality
+from defect_cls.paths import ARTIFACTS_ROOT, PROCESSED_DATA_ROOT
 
-ARTIFACTS_DIR = Path("data/artifacts")
-SPLITS_DIR = Path("data/processed")
+ARTIFACTS_DIR = ARTIFACTS_ROOT
+SPLITS_DIR = PROCESSED_DATA_ROOT
 
 st.set_page_config(page_title="산업 표면 결함 이미지 분류", page_icon="🔬", layout="centered")
 
@@ -48,7 +49,7 @@ if not checkpoints:
         "학습된 모델이 없습니다. 먼저 데이터 준비와 학습을 완료하세요:\n\n"
         "1. `python scripts/prepare_data.py --input <NEU-CLS 압축파일>\n"
         "2. `python -m defect_cls.train --experiment baseline`\n"
-        "3. `python -m defect_cls.evaluate --checkpoint data/artifacts/baseline/checkpoint.pt`"
+        "3. `python -m defect_cls.evaluate --checkpoint data/artifacts/baseline/seed-42/checkpoint.pt`"
     )
     st.stop()
 

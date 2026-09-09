@@ -12,6 +12,7 @@ import torch
 from defect_cls.data import IMAGE_SIZE
 from defect_cls.inference import load_image_tensor
 from defect_cls.model import load_checkpoint
+from defect_cls.paths import resolve_project_path
 
 
 def percentile(values: list[float], q: float) -> float:
@@ -86,7 +87,8 @@ def main() -> None:
     if args.iters < 1:
         parser.error("--iters must be at least 1")
 
-    model, checkpoint = load_checkpoint(args.checkpoint)
+    checkpoint_path = resolve_project_path(args.checkpoint)
+    model, checkpoint = load_checkpoint(checkpoint_path)
     image_mode = checkpoint.get("config", {}).get(
         "image_mode", "L" if checkpoint.get("in_channels") == 1 else "RGB"
     )
@@ -102,7 +104,7 @@ def main() -> None:
         parser.error(str(exc))
 
     results = {
-        "checkpoint": str(args.checkpoint),
+        "checkpoint": str(checkpoint_path),
         "experiment": checkpoint["experiment"],
         "input": str(args.image) if args.image is not None else f"random tensor 1x{input_channels}x{IMAGE_SIZE}x{IMAGE_SIZE}",
         "batch_size": 1,
@@ -114,7 +116,7 @@ def main() -> None:
         "threads": torch.get_num_threads(),
         "measurements": [benchmark_device(model, device, tensor, args.warmup, args.iters) for device in targets],
     }
-    out_path = args.out or args.checkpoint.parent / "benchmark.json"
+    out_path = resolve_project_path(args.out) if args.out else checkpoint_path.parent / "benchmark.json"
     decision = check_overwrite(out_path, args.force)
     if decision == "blocked":
         raise SystemExit(

@@ -14,6 +14,7 @@ import numpy as np
 from PIL import Image
 
 from defect_cls.data import CLASSES, build_stratified_split, parse_class_from_filename
+from defect_cls.paths import RAW_DATA_ROOT, project_relative_path, require_raw_input
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
 ARCHIVE_EXTENSIONS = {".zip", ".rar"}
@@ -40,8 +41,10 @@ def collect_images(root: Path) -> list[Path]:
 
 def to_manifest_path(path: Path) -> str:
     try:
-        return path.resolve().relative_to(Path.cwd().resolve()).as_posix()
+        return project_relative_path(path)
     except ValueError:
+        # inspect_entries is also used by isolated unit tests; run_preparation
+        # rejects inputs outside data/raw before any manifest is persisted.
         return path.resolve().as_posix()
 
 
@@ -275,7 +278,8 @@ def run_preparation(
     ratios: tuple[float, float, float],
     enforce_neu_contract: bool = False,
 ) -> tuple[Path, Path, dict]:
-    data_root = Path("data/raw")
+    input_path = require_raw_input(input_path)
+    data_root = RAW_DATA_ROOT
     if input_path.suffix.lower() in ARCHIVE_EXTENSIONS:
         scan_root = extract_archive(input_path, data_root)
     else:
@@ -295,8 +299,8 @@ def run_preparation(
 
     quality_path = out_dir / "data-quality.json"
     quality = {
-        "input": str(input_path),
-        "scanned_root": str(scan_root),
+        "input": project_relative_path(input_path),
+        "scanned_root": project_relative_path(scan_root),
         "files_found": len(files),
         "entries_kept": len(entries),
         "unique_entries": len(unique_entries),

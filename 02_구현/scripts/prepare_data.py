@@ -4,13 +4,14 @@ import argparse
 from pathlib import Path
 
 from defect_cls.data import CLASSES, SPLIT_RATIOS, SPLIT_SEED
+from defect_cls.paths import PROCESSED_DATA_ROOT, resolve_project_path
 from defect_cls.preparation import run_preparation
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate, split and manifest the defect dataset")
     parser.add_argument("--input", type=Path, required=True, help="NEU-CLS zip file or extracted directory")
-    parser.add_argument("--out-dir", type=Path, default=Path("data/processed"))
+    parser.add_argument("--out-dir", type=Path, default=PROCESSED_DATA_ROOT)
     parser.add_argument("--seed", type=int, default=SPLIT_SEED)
     parser.add_argument("--ratios", nargs=3, type=float, default=list(SPLIT_RATIOS))
     parser.add_argument(
@@ -21,8 +22,8 @@ def main() -> None:
     args = parser.parse_args()
 
     manifest_path, quality_path, quality = run_preparation(
-        args.input.resolve(),
-        args.out_dir,
+        resolve_project_path(args.input),
+        resolve_project_path(args.out_dir),
         args.seed,
         tuple(args.ratios),
         enforce_neu_contract=not args.allow_non_neu,

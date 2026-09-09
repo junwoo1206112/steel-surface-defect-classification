@@ -11,6 +11,8 @@ from torch.utils.data import DataLoader
 
 from defect_cls.data import DefectDataset, eval_transform
 from defect_cls.model import load_checkpoint
+from defect_cls.paths import PROCESSED_DATA_ROOT, resolve_project_path
+from defect_cls.seed_metrics import sha256_file
 from defect_cls.train import read_manifest, resolve_device
 
 
@@ -81,24 +83,28 @@ def save_confusion_png(confusion: list[list[int]], class_names: list[str], out_p
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate checkpoint on the test split")
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, default=Path("data/processed/manifest.csv"))
+    parser.add_argument("--manifest", type=Path, default=PROCESSED_DATA_ROOT / "manifest.csv")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--num-workers", type=int, default=0)
     args = parser.parse_args()
 
     device = resolve_device(args.device)
-    model, checkpoint = load_checkpoint(args.checkpoint, map_location=str(device))
+    checkpoint_path = resolve_project_path(args.checkpoint)
+    manifest_path = resolve_project_path(args.manifest)
+    model, checkpoint = load_checkpoint(checkpoint_path, map_location=str(device))
     model.to(device)
     image_mode = checkpoint.get("config", {}).get("image_mode", "RGB")
-    rows = read_manifest(args.manifest)
+    rows = read_manifest(manifest_path)
     test_set = DefectDataset(rows, "test", eval_transform(image_mode=image_mode), image_mode=image_mode)
     loader = DataLoader(
         test_set, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers
     )
     targets, preds = compute_predictions(model, loader, device)
     result = build_metrics(targets, preds, checkpoint["classes"])
-    result["checkpoint"] = str(args.checkpoint)
+    result["checkpoint"] = str(checkpoint_path)
+    result["manifest"] = str(manifest_path)
+    result["manifest_sha256"] = sha256_file(manifest_path)
     result["experiment"] = checkpoint["experiment"]
     result["selected_epoch"] = checkpoint["epoch"]
     result["seed"] = checkpoint["seed"]
@@ -108,11 +114,11 @@ def main() -> None:
     result["eval_time_torch"] = torch.__version__
     result["split"] = "test"
 
-    out_path = args.checkpoint.parent / "test-metrics.json"
+    out_path = checkpoint_path.parent / "test-metrics.json"
     out_path.write_text(
         json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    csv_path = args.checkpoint.parent / "confusion-matrix.csv"
+    csv_path = checkpoint_path.parent / "confusion-matrix.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
         writer.writerow(["true\\pred"] + result["class_order"])
@@ -121,7 +127,7 @@ def main() -> None:
     save_confusion_png(
         result["confusion_matrix"],
         result["class_order"],
-        args.checkpoint.parent / "confusion-matrix.png",
+        checkpoint_path.parent / "confusion-matrix.png",
     )
     print(
         f"[{result['experiment']}] test accuracy={result['accuracy']:.4f} "

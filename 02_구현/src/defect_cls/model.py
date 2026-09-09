@@ -24,7 +24,18 @@ def build_model(num_classes: int = len(CLASSES), pretrained: bool = True, in_cha
 
 
 def load_checkpoint(path: str | Path, map_location: str = "cpu"):
-    checkpoint = torch.load(path, map_location=map_location, weights_only=False)
+    try:
+        checkpoint = torch.load(path, map_location=map_location, weights_only=True)
+    except Exception as exc:
+        raise ValueError(f"checkpoint could not be safely loaded: {path}") from exc
+    if not isinstance(checkpoint, dict):
+        raise ValueError("checkpoint must be a dictionary")
+    if checkpoint.get("classes") != list(CLASSES):
+        raise ValueError("checkpoint classes do not match the supported class contract")
+    if checkpoint.get("in_channels", 3) not in {1, 3}:
+        raise ValueError("checkpoint in_channels must be 1 or 3")
+    if not isinstance(checkpoint.get("state_dict"), dict):
+        raise ValueError("checkpoint is missing a state_dict")
     model = build_model(
         num_classes=len(checkpoint["classes"]),
         pretrained=False,

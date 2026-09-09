@@ -22,7 +22,7 @@
 | 재현성 | seed 고정 재실행에서 epoch별·test 지표 완전 일치 확인 |
 | 추론 (batch=1) | 시스템 상태에 크게 좌우: 저부하 세션 CPU p50 10.4~11.7ms / GPU 1.65~1.87ms, 부하 경합 세션 CPU ~50.7ms / GPU ~6.2ms. 실행 조건을 함께 기록해야 함 |
 | 임계값 근거 | baseline val 최저 신뢰도 0.4995 → 임계값 0.60은 정답 1건을 재검토 플래그하는 보수 설정 |
-| 자동 테스트 | 62개 통과 |
+| 자동 테스트 | 70개 통과 (현재 코드 기준, 합성 fixture·CPU smoke test 포함) |
 
 자세한 수치·측정 조건·한계: `docs/experiment-results.md` · 데이터 권리·중복 처리: `docs/data-governance.md` · 채용 담당자용 요약: `docs/portfolio-summary.md`
 
@@ -51,43 +51,48 @@ python -m pytest -q -p no:cacheprovider --basetemp="$env:TEMP\opencode\pytest-tm
 > 참고: Windows에서 pytest 기본 임시폴더에 권한 오류(WinError 5)가 있는 환경이므로 `--basetemp`를 지정한다.
 
 ```bash
-# 1) 데이터 준비 (공식 NEU-CLS 압축파일 경로 지정)
-python scripts/prepare_data.py --input <NEU-CLS.zip 또는 .rar>  # NEU-CLS 계약(1,800/6x300/200x200)을 강제
+# 1) 데이터 준비: 다운로드한 압축파일/해제 폴더를 먼저 data/raw/ 아래에 둔다.
+#    입력은 data/raw/ 밖을 허용하지 않으며 NEU-CLS 계약(1,800/6x300/200x200)을 강제한다.
+python scripts/prepare_data.py --input data/raw/<NEU-CLS.zip 또는 .rar>
 
 # 2) 학습 (baseline = 증강 없음, augmented = 기본 증강)
-python -m defect_cls.train --experiment baseline --device cuda
-python -m defect_cls.train --experiment augmented --device cuda
+python -m defect_cls.train --experiment baseline --seed 42 --device cuda
+python -m defect_cls.train --experiment augmented --seed 42 --device cuda
 
 # 3) test 평가 (혼동행렬·클래스별 지표 산출)
-python -m defect_cls.evaluate --checkpoint data/artifacts/baseline/checkpoint.pt --device cuda
-python -m defect_cls.evaluate --checkpoint data/artifacts/augmented/checkpoint.pt --device cuda
+python -m defect_cls.evaluate --checkpoint data/artifacts/baseline/seed-42/checkpoint.pt --device cuda
+python -m defect_cls.evaluate --checkpoint data/artifacts/augmented/seed-42/checkpoint.pt --device cuda
 
 # 4) 단일 이미지 추론 벤치마크 (CPU/GPU 병기)
 #    기존 benchmark.json이 있으면 --force 또는 --out이 필요하다(덮어쓰기 방지).
 #    --devices에는 사용 가능한 cpu/cuda만 지정하며, 요청 장치가 없으면 실패한다.
-python -m defect_cls.benchmark --checkpoint data/artifacts/baseline/checkpoint.pt --image <이미지> --devices cpu,cuda
+python -m defect_cls.benchmark --checkpoint data/artifacts/baseline/seed-42/checkpoint.pt --image data/raw/<이미지> --devices cpu,cuda
 
 # 5) 임계값 근거 측정 + 보정/강건성/품질게이트 분석
-python scripts/confidence_scan.py --checkpoint data/artifacts/baseline/checkpoint.pt
-python scripts/calibrate_temperature.py --checkpoint data/artifacts/baseline/checkpoint.pt
-python scripts/ood_scan.py --checkpoint data/artifacts/baseline/checkpoint.pt
-python scripts/quality_gate_calibration.py --checkpoint data/artifacts/baseline/checkpoint.pt
+python scripts/confidence_scan.py --checkpoint data/artifacts/baseline/seed-42/checkpoint.pt
+python scripts/calibrate_temperature.py --checkpoint data/artifacts/baseline/seed-42/checkpoint.pt
+python scripts/ood_scan.py --checkpoint data/artifacts/baseline/seed-42/checkpoint.pt
+python scripts/quality_gate_calibration.py --checkpoint data/artifacts/baseline/seed-42/checkpoint.pt
 
-# 6) 데모
+# 6) 안전 로드 CPU smoke test / 이미 완료된 다중-seed 결과만 집계
+python scripts/cpu_smoke_test.py --checkpoint data/artifacts/baseline/seed-42/checkpoint.pt
+python scripts/aggregate_seed_metrics.py --metrics data/artifacts/baseline/seed-<seed>/test-metrics.json [...]
+
+# 7) 데모
 streamlit run app/demo.py
 ```
 
 ## 데모 동작 (판단 보조 원칙)
 
-- `02_구현` 디렉터리에서 실행한다(체크포인트·manifest 경로가 상대경로다).
-- 업로드 형식(jpg/jpeg/png/bmp)·크기(≤10MB)·이미지 유효성을 검사하고, 손상 파일은 오류로 안내한다.
+- 기본 `manifest`·`data/raw`·`data/artifacts` 경로는 프로젝트 위치를 기준으로 해석하므로, 설치 후에는 현재 작업 디렉터리에 의존하지 않는다. CLI에 상대 경로를 줄 때도 프로젝트 루트를 기준으로 해석한다.
+- 업로드 형식(jpg/jpeg/png/bmp)·파일 크기(≤10MB)·픽셀 수(≤20,000,000)·이미지 유효성을 검사하고, 손상 파일은 오류로 안내한다.
 - 예측 클래스와 신뢰도를 표시하며, **신뢰도가 임계값(기본 0.60) 미만이면 예측을 확정하지 않고 `판단 보조 결과 — 재검토 필요`를 표시한다.**
 - **입력 품질 게이트**: 업로드 이미지의 노이즈·밝기 지표가 실험용 임계값을 벗어나면 신뢰도와 무관하게 재검토로 표시한다. 임계값은 200×200 validation 이미지에서 탐색적으로 정한 보조 신호이므로, 임의 해상도·압축 형식 업로드의 운영 품질을 보증하지 않는다.
 - UI는 실제 검사 장비나 불량 확정 도구가 아님을 화면에 명시한다.
 
 ## 데이터 라이선스·인용
 
-- NEU surface defect database (NEU-CLS): Northeastern University, Kechen Song · Yunhui Yan. 학술 연구 목적 공개, 상업적 이용 불가.
+- NEU surface defect database (NEU-CLS): Northeastern University, Kechen Song · Yunhui Yan. 제공 페이지에 기록된 학술 연구 목적·상업적 이용 제한·논문 인용 조건을 따른다. 실제 이용·공개·상업적 활용 전에는 제공 기관의 최신 조건을 별도로 확인해야 한다.
 - 인용: K. Song and Y. Yan, "A noise robust method based on completed local binary patterns for hot-rolled steel strip surface defects," *Applied Surface Science*, vol. 285, pp. 858-864, 2013.
 - 원본 데이터·압축파일·학습 가중치는 Git에 포함하지 않는다(`.gitignore`).
 

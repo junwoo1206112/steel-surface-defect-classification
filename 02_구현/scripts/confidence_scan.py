@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from defect_cls.data import DefectDataset, eval_transform
 from defect_cls.model import load_checkpoint
 from defect_cls.train import read_manifest, resolve_device
+from defect_cls.paths import PROCESSED_DATA_ROOT, resolve_project_path
 
 
 def confidence_stats(values: list[float]) -> dict:
@@ -50,19 +51,21 @@ def scan_confidence(model, loader, device) -> tuple[list[float], int]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validation-set confidence scan for threshold evidence")
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, default=Path("data/processed/manifest.csv"))
+    parser.add_argument("--manifest", type=Path, default=PROCESSED_DATA_ROOT / "manifest.csv")
     parser.add_argument("--split", choices=["val", "test"], default="val")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--batch-size", type=int, default=64)
     args = parser.parse_args()
 
     device = resolve_device(args.device)
-    model, checkpoint = load_checkpoint(args.checkpoint, map_location=str(device))
+    checkpoint_path = resolve_project_path(args.checkpoint)
+    manifest_path = resolve_project_path(args.manifest)
+    model, checkpoint = load_checkpoint(checkpoint_path, map_location=str(device))
     model.to(device)
     image_mode = checkpoint.get("config", {}).get(
         "image_mode", "L" if checkpoint.get("in_channels") == 1 else "RGB"
     )
-    rows = read_manifest(args.manifest)
+    rows = read_manifest(manifest_path)
     dataset = DefectDataset(
         rows,
         args.split,
@@ -72,7 +75,7 @@ def main() -> None:
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
     values, accuracy = scan_confidence(model, loader, device)
     result = {
-        "checkpoint": str(args.checkpoint),
+        "checkpoint": str(checkpoint_path),
         "experiment": checkpoint["experiment"],
         "split": args.split,
         "num_samples": len(values),
@@ -82,7 +85,7 @@ def main() -> None:
         "torch": torch.__version__,
         "device": str(device),
     }
-    out_path = args.checkpoint.parent / f"confidence-scan-{args.split}.json"
+    out_path = checkpoint_path.parent / f"confidence-scan-{args.split}.json"
     out_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps(result["confidence"], ensure_ascii=False))
     print(f"accuracy={accuracy:.4f} n={len(values)} saved: {out_path}")

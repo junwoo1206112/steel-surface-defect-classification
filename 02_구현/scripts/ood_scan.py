@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from defect_cls.data import CLASSES, CLASS_TO_INDEX, eval_transform
 from defect_cls.model import load_checkpoint
+from defect_cls.paths import PROCESSED_DATA_ROOT, resolve_project_path, resolve_raw_path
 from defect_cls.perturbation import apply_perturbation
 from defect_cls.train import read_manifest, resolve_device
 
@@ -40,7 +41,7 @@ class PerturbedValSet(Dataset):
 
     def __getitem__(self, index: int):
         row = self.rows[index]
-        image = apply_perturbation(Image.open(row["filepath"]), self.kind, self.level)
+        image = apply_perturbation(Image.open(resolve_raw_path(row["filepath"])), self.kind, self.level)
         image = image.convert(self.image_mode)
         return self.transform(image), CLASS_TO_INDEX[row["class_label"]]
 
@@ -73,7 +74,7 @@ def scan(model, loader, device, temperature: float = 1.0):
 def main() -> None:
     parser = argparse.ArgumentParser(description="OOD-style robustness scan on validation set")
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, default=Path("data/processed/manifest.csv"))
+    parser.add_argument("--manifest", type=Path, default=PROCESSED_DATA_ROOT / "manifest.csv")
     parser.add_argument("--device", default="auto")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--temperature", type=float, default=1.0, help="softmax temperature for confidence")
@@ -81,11 +82,13 @@ def main() -> None:
     args = parser.parse_args()
 
     device = resolve_device(args.device)
-    model, checkpoint = load_checkpoint(args.checkpoint, map_location=str(device))
+    checkpoint_path = resolve_project_path(args.checkpoint)
+    manifest_path = resolve_project_path(args.manifest)
+    model, checkpoint = load_checkpoint(checkpoint_path, map_location=str(device))
     model.to(device)
     image_mode = checkpoint.get("config", {}).get("image_mode", "RGB")
     transform = eval_transform(image_mode=image_mode)
-    rows = read_manifest(args.manifest)
+    rows = read_manifest(manifest_path)
 
     results = []
     for name, kind, level in SCAN_CONFIGS:
@@ -102,7 +105,7 @@ def main() -> None:
         )
 
     payload = {
-        "checkpoint": str(args.checkpoint),
+        "checkpoint": str(checkpoint_path),
         "experiment": checkpoint["experiment"],
         "split": "val",
         "threshold": 0.60,
@@ -112,7 +115,7 @@ def main() -> None:
         "device": str(device),
         "results": results,
     }
-    out_path = args.out or args.checkpoint.parent / "ood-robustness.json"
+    out_path = resolve_project_path(args.out) if args.out else checkpoint_path.parent / "ood-robustness.json"
     out_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"saved: {out_path}")
 

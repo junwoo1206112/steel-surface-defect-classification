@@ -1,6 +1,6 @@
 {
-  "input": "C:\\취업 구직2\\반도체_표면_결함_탐지_포트폴리오\\02_구현\\data\\raw\\NEU-CLS\\NEU-CLS",
-  "scanned_root": "C:\\취업 구직2\\반도체_표면_결함_탐지_포트폴리오\\02_구현\\data\\raw\\NEU-CLS\\NEU-CLS",
+  "input": "data/raw/NEU-CLS/NEU-CLS",
+  "scanned_root": "data/raw/NEU-CLS/NEU-CLS",
   "files_found": 1800,
   "entries_kept": 1800,
   "unique_entries": 1799,

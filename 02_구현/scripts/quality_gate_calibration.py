@@ -14,6 +14,7 @@ from defect_cls.model import load_checkpoint
 from defect_cls.perturbation import apply_perturbation
 from defect_cls.quality import sharpness_score, estimate_noise_sigma, mean_brightness
 from defect_cls.train import read_manifest
+from defect_cls.paths import PROCESSED_DATA_ROOT, resolve_project_path, resolve_raw_path
 
 SCAN_CONFIGS = (
     ("clean", "clean", 0.0),
@@ -45,10 +46,12 @@ def summarize(values: list[float]) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Measure image-quality metrics on val set per perturbation")
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--manifest", type=Path, default=Path("data/processed/manifest.csv"))
+    parser.add_argument("--manifest", type=Path, default=PROCESSED_DATA_ROOT / "manifest.csv")
     args = parser.parse_args()
 
-    rows = [row for row in read_manifest(args.manifest) if row["split"] == "val"]
+    manifest_path = resolve_project_path(args.manifest)
+    checkpoint_path = resolve_project_path(args.checkpoint)
+    rows = [row for row in read_manifest(manifest_path) if row["split"] == "val"]
     image_paths = [row["filepath"] for row in rows]
 
     per_config = {}
@@ -57,7 +60,7 @@ def main() -> None:
         noise_list = []
         brightness_list = []
         for path in image_paths:
-            image = apply_perturbation(Image.open(path), kind, level)
+            image = apply_perturbation(Image.open(resolve_raw_path(path)), kind, level)
             sharpness_list.append(sharpness_score(image))
             noise_list.append(estimate_noise_sigma(image))
             brightness_list.append(mean_brightness(image))
@@ -76,12 +79,12 @@ def main() -> None:
         )
 
     payload = {
-        "checkpoint": str(args.checkpoint),
-        "manifest": str(args.manifest),
+        "checkpoint": str(checkpoint_path),
+        "manifest": str(manifest_path),
         "note": "clean val 분포로 품질 게이트 임계값의 근거를 만든다. 임계값 확정 전에는 기본 상수를 신뢰하지 않는다.",
         "per_config": per_config,
     }
-    out_path = args.checkpoint.parent / "quality-gate-calibration.json"
+    out_path = checkpoint_path.parent / "quality-gate-calibration.json"
     out_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"saved: {out_path}")
 
