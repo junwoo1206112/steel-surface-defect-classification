@@ -29,8 +29,9 @@ def validate_checkpoint_manifest(checkpoint: dict, manifest_path: Path) -> str:
         )
     return actual
 
-    model.eval()
+
 def compute_predictions(model, loader, device):
+    model.eval()
     targets = []
     preds = []
     with torch.no_grad():

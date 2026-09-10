@@ -82,6 +82,7 @@ def check_training_output(out_dir: Path, overwrite: bool) -> None:
 
     parser = argparse.ArgumentParser(description="Train defect classification model")
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Train defect classification model")
     parser.add_argument("--manifest", type=Path, default=PROCESSED_DATA_ROOT / "manifest.csv")
     parser.add_argument("--experiment", choices=["baseline", "augmented", "grayscale1ch"], required=True)
     parser.add_argument("--input-channels", type=int, choices=[1, 3], default=3)
