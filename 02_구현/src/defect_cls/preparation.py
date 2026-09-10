@@ -3,9 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
-import shutil
 import stat
-import subprocess
 import zipfile
 from collections import Counter
 from pathlib import Path
@@ -17,7 +15,7 @@ from defect_cls.data import CLASSES, build_stratified_split, parse_class_from_fi
 from defect_cls.paths import RAW_DATA_ROOT, project_relative_path, require_raw_input, resolve_raw_path
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
-ARCHIVE_EXTENSIONS = {".zip", ".rar"}
+ARCHIVE_EXTENSIONS = {".zip"}
 NEU_EXPECTED_TOTAL = 1800
 NEU_EXPECTED_PER_CLASS = 300
 NEU_EXPECTED_SIZE = (200, 200)
@@ -221,11 +219,6 @@ def eda(rows: list[dict]) -> dict:
     }
 
 
-SEVENZIP_CANDIDATES = (
-    r"C:\Program Files\7-Zip\7z.exe",
-    r"C:\Program Files (x86)\7-Zip\7z.exe",
-)
-
 
 def validate_zip_members(archive: zipfile.ZipFile, extract_dir: Path) -> None:
     """Reject path traversal and symlink entries before extracting a ZIP file."""
@@ -249,23 +242,6 @@ def extract_archive(input_path: Path, data_root: Path) -> Path:
         with zipfile.ZipFile(input_path) as archive:
             validate_zip_members(archive, extract_dir)
             archive.extractall(extract_dir)
-    elif suffix == ".rar":
-        sevenzip = shutil.which("7z") or next(
-            (path for path in SEVENZIP_CANDIDATES if Path(path).exists()), None
-        )
-        if sevenzip is None:
-            raise FileNotFoundError(
-                "RAR 해제를 위한 7-Zip(7z.exe)을 찾지 못했다. 7-Zip 설치 후 재실행하거나 "
-                "미리 압축을 푼 디렉터리를 --input으로 지정한다."
-            )
-        result = subprocess.run(
-            [sevenzip, "x", str(input_path), f"-o{extract_dir}", "-y"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"7z extraction failed (exit {result.returncode}): {result.stderr}")
     else:
         raise ValueError(f"unsupported archive type: {suffix}")
     return extract_dir
@@ -297,6 +273,11 @@ def run_preparation(
     manifest_path = out_dir / "manifest.csv"
     write_manifest(split_rows, manifest_path)
 
+    if input_path.suffix.lower() == ".rar":
+        raise ValueError(
+            "RAR 입력은 안전하게 검증할 수 없어 지원하지 않는다. "
+            "신뢰할 수 있는 도구로 data/raw 아래에 먼저 해제한 디렉터리 또는 ZIP을 지정하라."
+        )
     quality_path = out_dir / "data-quality.json"
     quality = {
         "input": project_relative_path(input_path),

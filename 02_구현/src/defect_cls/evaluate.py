@@ -16,8 +16,21 @@ from defect_cls.seed_metrics import sha256_file
 from defect_cls.train import read_manifest, resolve_device
 
 
-def compute_predictions(model, loader, device):
+def validate_checkpoint_manifest(checkpoint: dict, manifest_path: Path) -> str:
+    """Require evaluation data to be the exact manifest used for training."""
+    expected = checkpoint.get("config", {}).get("manifest_sha256")
+    if not isinstance(expected, str) or not expected:
+        raise ValueError("checkpoint is missing manifest_sha256 provenance")
+    actual = sha256_file(manifest_path)
+    if actual != expected:
+        raise ValueError(
+            "checkpoint manifest SHA-256 does not match the evaluation manifest; "
+            "refusing to produce non-comparable test metrics"
+        )
+    return actual
+
     model.eval()
+def compute_predictions(model, loader, device):
     targets = []
     preds = []
     with torch.no_grad():
@@ -95,6 +108,7 @@ def main() -> None:
     model, checkpoint = load_checkpoint(checkpoint_path, map_location=str(device))
     model.to(device)
     image_mode = checkpoint.get("config", {}).get("image_mode", "RGB")
+    manifest_sha256 = validate_checkpoint_manifest(checkpoint, manifest_path)
     rows = read_manifest(manifest_path)
     test_set = DefectDataset(rows, "test", eval_transform(image_mode=image_mode), image_mode=image_mode)
     loader = DataLoader(
@@ -104,7 +118,7 @@ def main() -> None:
     result = build_metrics(targets, preds, checkpoint["classes"])
     result["checkpoint"] = str(checkpoint_path)
     result["manifest"] = str(manifest_path)
-    result["manifest_sha256"] = sha256_file(manifest_path)
+    result["manifest_sha256"] = manifest_sha256
     result["experiment"] = checkpoint["experiment"]
     result["selected_epoch"] = checkpoint["epoch"]
     result["seed"] = checkpoint["seed"]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from defect_cls.evaluate import build_metrics
+from defect_cls.evaluate import build_metrics, validate_checkpoint_manifest
 from defect_cls.preparation import (
     dedupe_entries,
     find_duplicates,
@@ -79,3 +79,17 @@ def test_find_near_duplicate_candidates_reports_similar_images(synthetic_raw_dir
             "hamming_distance": 0,
         }
     ]
+
+
+def test_evaluation_requires_the_training_manifest_hash(tmp_path) -> None:
+    from defect_cls.seed_metrics import sha256_file
+
+    manifest = tmp_path / "manifest.csv"
+    manifest.write_text("filepath,split\ndata/raw/example.bmp,test\n", encoding="utf-8")
+    checkpoint = {"config": {"manifest_sha256": sha256_file(manifest)}}
+    assert validate_checkpoint_manifest(checkpoint, manifest) == sha256_file(manifest)
+
+    other_manifest = tmp_path / "other-manifest.csv"
+    other_manifest.write_text("filepath,split\ndata/raw/example.bmp,train\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="does not match"):
+        validate_checkpoint_manifest(checkpoint, other_manifest)

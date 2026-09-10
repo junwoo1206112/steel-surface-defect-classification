@@ -178,3 +178,25 @@ def test_neu_contract_rejects_non_neu_fixture(synthetic_raw_dir: Path, tmp_path:
             (0.7, 0.15, 0.15),
             enforce_neu_contract=True,
         )
+
+
+def test_training_output_requires_explicit_overwrite(tmp_path: Path) -> None:
+    from defect_cls.train import check_training_output
+
+    out_dir = tmp_path / "baseline" / "seed-42"
+    out_dir.mkdir(parents=True)
+    (out_dir / "checkpoint.pt").write_bytes(b"checkpoint")
+    with pytest.raises(FileExistsError, match="--overwrite"):
+        check_training_output(out_dir, overwrite=False)
+    check_training_output(out_dir, overwrite=True)
+
+
+def test_preparation_rejects_rar_inputs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import defect_cls.paths as paths
+
+    monkeypatch.setattr(paths, "RAW_DATA_ROOT", tmp_path)
+    archive_path = tmp_path / "unsafe-input.rar"
+    archive_path.write_bytes(b"not-a-rar")
+    with pytest.raises(ValueError, match="RAR 입력"):
+        run_preparation(archive_path, tmp_path / "processed", 42, (0.7, 0.15, 0.15))
+

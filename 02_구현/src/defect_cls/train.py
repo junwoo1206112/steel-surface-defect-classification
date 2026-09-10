@@ -71,8 +71,17 @@ def resolve_device(requested: str) -> torch.device:
     return torch.device(requested)
 
 
-def main() -> None:
+def check_training_output(out_dir: Path, overwrite: bool) -> None:
+    """Protect completed seed artifacts from accidental replacement."""
+    existing = [path.name for path in (out_dir / "checkpoint.pt", out_dir / "history.json") if path.exists()]
+    if existing and not overwrite:
+        raise FileExistsError(
+            f"training artifacts already exist in {out_dir}: {', '.join(existing)}; "
+            "use --overwrite only after preserving or reviewing the prior run"
+        )
+
     parser = argparse.ArgumentParser(description="Train defect classification model")
+def main() -> None:
     parser.add_argument("--manifest", type=Path, default=PROCESSED_DATA_ROOT / "manifest.csv")
     parser.add_argument("--experiment", choices=["baseline", "augmented", "grayscale1ch"], required=True)
     parser.add_argument("--input-channels", type=int, choices=[1, 3], default=3)
@@ -84,6 +93,7 @@ def main() -> None:
     parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--out-dir", type=Path, default=ARTIFACTS_ROOT)
+    parser.add_argument("--overwrite", action="store_true", help="replace existing checkpoint/history for this experiment and seed")
     args = parser.parse_args()
 
     augmented = args.experiment == "augmented"
@@ -95,6 +105,7 @@ def main() -> None:
     device = resolve_device(args.device)
     manifest_path = resolve_project_path(args.manifest)
     out_dir = seed_artifact_dir(args.experiment, args.seed, args.out_dir)
+    check_training_output(out_dir, args.overwrite)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     rows = read_manifest(manifest_path)

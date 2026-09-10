@@ -10,12 +10,12 @@
 
 ## 원본 화면
 
-![baseline legacy checkpoint demo result](screenshots/demo-result-baseline-legacy-cr1.png)
+![baseline legacy checkpoint demo result](screenshots/demo-result-baseline-legacy-cr1-cropped.png)
 
 ## 무결성
 
-- 파일: `docs/screenshots/demo-result-baseline-legacy-cr1.png`
-- SHA-256: `EF34CFC7909CB6DABE30E64CD2D343C6E7BC6B4C313D9079AA6665FE832A30D9`
-- 원본 화면은 내용 변경 없이 저장했다. 브라우저와 작업 화면이 함께 보이는 전체 캡처이므로, 결과가 수동 생성된 이미지가 아니라 로컬 Streamlit 실행 화면임을 확인할 수 있다.
+- 파일: `docs/screenshots/demo-result-baseline-legacy-cr1-cropped.png`
+- SHA-256: `2BD9A10D09790681E1BAD0B74AD9FEE87C009AC3828CE7A13906A173860996C2`
+- 결과 영역만 보이도록 원본 화면을 결정론적으로 크롭했다. 예측 결과·입력 파일명·선택한 legacy 체크포인트·모델 메타데이터는 변경하지 않았다.
 
 이 증빙은 사용자 제공 화면과 실제 로컬 앱 실행을 연결하기 위한 기록이다. 분류 결과는 공개 NEU-CLS 기반 실험 모델의 판단 보조 결과이며, 실제 검사 장비의 품질 확정에는 사용하지 않는다.

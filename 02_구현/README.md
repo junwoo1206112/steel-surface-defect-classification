@@ -22,7 +22,7 @@
 | 재현성 | seed 고정 재실행에서 epoch별·test 지표 완전 일치 확인 |
 | 추론 (batch=1) | 시스템 상태에 크게 좌우: 저부하 세션 CPU p50 10.4~11.7ms / GPU 1.65~1.87ms, 부하 경합 세션 CPU ~50.7ms / GPU ~6.2ms. 실행 조건을 함께 기록해야 함 |
 | 임계값 근거 | baseline val 최저 신뢰도 0.4995 → 임계값 0.60은 정답 1건을 재검토 플래그하는 보수 설정 |
-| 자동 테스트 | 76개 통과 (현재 코드 기준, 합성 fixture·CPU smoke test 포함) |
+| 자동 테스트 | 81개 통과 (현재 코드 기준, 합성 fixture·CPU smoke test 포함) |
 
 자세한 수치·측정 조건·한계: `docs/experiment-results.md` · 데이터 권리·중복 처리: `docs/data-governance.md` · 채용 담당자용 요약: `docs/portfolio-summary.md`
 
@@ -33,14 +33,14 @@
   src/defect_cls/     data(데이터셋·증강) model train evaluate inference benchmark preparation
   scripts/            prepare_data.py(검증·분할·EDA) confidence_scan.py(임계값 근거)
   app/demo.py         Streamlit 판단 보조 데모
-  tests/              76개 자동 테스트 (합성 fixture, 실데이터 불필요)
+  tests/              81개 자동 테스트 (합성 fixture, 실데이터 불필요)
   docs/               data-governance, experiment-results, portfolio-summary
   data/               raw(Git 제외), processed(manifest·품질보고서), artifacts(체크포인트·지표)
 ```
 
 ## 실행 방법
 
-요구사항: Python 3.12, CUDA GPU(선택 — CPU만으로도 학습 가능하지만 느림), RAR 입력 시 7-Zip.
+요구사항: Python 3.12, CUDA GPU(선택 — CPU만으로도 학습 가능하지만 느림), NEU-CLS ZIP 또는 미리 해제한 디렉터리.
 
 ```bash
 pip install -r requirements.txt
@@ -51,9 +51,9 @@ python -m pytest -q -p no:cacheprovider --basetemp="$env:TEMP\opencode\pytest-tm
 > 참고: Windows에서 pytest 기본 임시폴더에 권한 오류(WinError 5)가 있는 환경이므로 `--basetemp`를 지정한다.
 
 ```bash
-# 1) 데이터 준비: 다운로드한 압축파일/해제 폴더를 먼저 data/raw/ 아래에 둔다.
+# 1) 데이터 준비: 다운로드한 ZIP 또는 미리 해제한 폴더를 data/raw/ 아래에 둔다.
 #    입력은 data/raw/ 밖을 허용하지 않으며 NEU-CLS 계약(1,800/6x300/200x200)을 강제한다.
-python scripts/prepare_data.py --input data/raw/<NEU-CLS.zip 또는 .rar>
+python scripts/prepare_data.py --input data/raw/<NEU-CLS.zip 또는 해제 폴더>
 
 # 2) 학습 (baseline = 증강 없음, augmented = 기본 증강)
 python -m defect_cls.train --experiment baseline --seed 42 --device cuda

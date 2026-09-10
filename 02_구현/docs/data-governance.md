@@ -57,4 +57,4 @@
 - 실측 분할 결과: train 1,259 / val 270 / test 270 (클래스별 210/45/45, patches만 209/45/45).
 - test set은 모델 선택·증강 선택에 사용하지 않는다(학습·검증·선택은 train/val만 사용).
 - 분할 결과는 `data/processed/manifest.csv`, `data-quality.json`으로 Git에 포함(원본 이미지 제외). 두 파일에는 프로젝트 상대 경로만 기록하며, 절대 경로·사용자명은 기록하지 않는다.
-- 재현 명령: `python scripts/prepare_data.py --input data/raw/<NEU-CLS 압축파일>` (RAR은 7-Zip 필요). 입력 파일·해제 폴더는 반드시 `data/raw/` 아래에 둔다.
+- 재현 명령: `python scripts/prepare_data.py --input data/raw/<NEU-CLS ZIP 또는 해제 폴더>`. 입력 파일·해제 폴더는 반드시 `data/raw/` 아래에 둔다. RAR 원본을 받았다면 신뢰할 수 있는 도구로 먼저 해제한 디렉터리를 지정한다.
