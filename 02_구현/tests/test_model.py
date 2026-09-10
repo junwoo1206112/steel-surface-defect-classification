@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import torch
 import pytest
+from torch.torch_version import TorchVersion
 
 from defect_cls.data import CLASSES
 from defect_cls.model import build_model, load_checkpoint
@@ -50,6 +51,24 @@ def test_safe_checkpoint_load_and_cpu_smoke_test(tmp_path) -> None:
     assert result["device"] == "cpu"
     assert result["output_shape"] == [1, len(CLASSES)]
 
+
+def test_safe_checkpoint_load_supports_legacy_torch_version_metadata(tmp_path) -> None:
+    model = build_model(pretrained=False)
+    checkpoint_path = tmp_path / "legacy-checkpoint.pt"
+    torch.save(
+        {
+            "state_dict": model.state_dict(),
+            "classes": list(CLASSES),
+            "experiment": "baseline",
+            "in_channels": 3,
+            "environment": {"torch": TorchVersion(torch.__version__)},
+        },
+        checkpoint_path,
+    )
+
+    _, checkpoint = load_checkpoint(checkpoint_path)
+
+    assert checkpoint["environment"]["torch"] == torch.__version__
 
 def test_safe_checkpoint_load_rejects_wrong_class_contract(tmp_path) -> None:
     checkpoint_path = tmp_path / "bad.pt"

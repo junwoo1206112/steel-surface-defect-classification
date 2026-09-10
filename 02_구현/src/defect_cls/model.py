@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import torch
+from torch.torch_version import TorchVersion
 from torchvision import models
 
 from defect_cls.data import CLASSES
@@ -25,7 +26,11 @@ def build_model(num_classes: int = len(CLASSES), pretrained: bool = True, in_cha
 
 def load_checkpoint(path: str | Path, map_location: str = "cpu"):
     try:
-        checkpoint = torch.load(path, map_location=map_location, weights_only=True)
+        # Legacy project checkpoints stored ``torch.__version__`` as a TorchVersion
+        # instance. Keep weights-only deserialization enabled and scope the sole
+        # compatibility allowlist entry to this load operation.
+        with torch.serialization.safe_globals([TorchVersion]):
+            checkpoint = torch.load(path, map_location=map_location, weights_only=True)
     except Exception as exc:
         raise ValueError(f"checkpoint could not be safely loaded: {path}") from exc
     if not isinstance(checkpoint, dict):
