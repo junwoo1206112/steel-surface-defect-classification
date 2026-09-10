@@ -9,6 +9,10 @@ from defect_cls.model import build_model, load_checkpoint
 from defect_cls.smoke import run_cpu_smoke_test
 
 
+class UnsupportedLegacyMetadata:
+    pass
+
+
 def test_build_model_default_3ch() -> None:
     model = build_model(pretrained=False)
     assert model.conv1.weight.shape == (64, 3, 7, 7)
@@ -66,11 +70,33 @@ def test_safe_checkpoint_load_supports_legacy_torch_version_metadata(tmp_path) -
         checkpoint_path,
     )
 
+    torch_version_preallowed = TorchVersion in torch.serialization.get_safe_globals()
     _, checkpoint = load_checkpoint(checkpoint_path)
 
+    assert isinstance(checkpoint["environment"]["torch"], TorchVersion)
     assert checkpoint["environment"]["torch"] == torch.__version__
+    assert (TorchVersion in torch.serialization.get_safe_globals()) is torch_version_preallowed
+def test_safe_checkpoint_load_rejects_unsupported_legacy_metadata(tmp_path) -> None:
+
+
+    model = build_model(pretrained=False)
+    checkpoint_path = tmp_path / "unsafe-legacy-checkpoint.pt"
+    torch.save(
+        {
+            "state_dict": model.state_dict(),
+            "classes": list(CLASSES),
+            "experiment": "baseline",
+            "in_channels": 3,
+            "environment": {"metadata": UnsupportedLegacyMetadata()},
+        },
+        checkpoint_path,
+    )
+
+    with pytest.raises(ValueError, match="could not be safely loaded"):
+        load_checkpoint(checkpoint_path)
 
 def test_safe_checkpoint_load_rejects_wrong_class_contract(tmp_path) -> None:
+
     checkpoint_path = tmp_path / "bad.pt"
     torch.save({"state_dict": {}, "classes": ["wrong"], "in_channels": 3}, checkpoint_path)
     with pytest.raises(ValueError, match="classes"):
