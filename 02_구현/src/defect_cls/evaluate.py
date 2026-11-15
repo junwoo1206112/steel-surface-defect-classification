@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 from defect_cls.data import DefectDataset, eval_transform
 from defect_cls.model import load_checkpoint
 from defect_cls.paths import PROCESSED_DATA_ROOT, resolve_project_path
+from defect_cls.reliability import summarize_reliability
 from defect_cls.seed_metrics import sha256_file
 from defect_cls.train import read_manifest, resolve_device
 
@@ -41,6 +42,20 @@ def compute_predictions(model, loader, device):
             preds.extend(outputs.argmax(dim=1).cpu().tolist())
             targets.extend(labels.tolist())
     return targets, preds
+
+
+def compute_probabilities(model, loader, device):
+    """Return targets and softmax probabilities for reliability analysis."""
+    model.eval()
+    targets = []
+    probabilities = []
+    with torch.no_grad():
+        for images, labels in loader:
+            images = images.to(device)
+            outputs = model(images)
+            probabilities.extend(torch.softmax(outputs, dim=1).cpu().tolist())
+            targets.extend(labels.tolist())
+    return targets, probabilities
 
 
 def build_metrics(targets: list[int], preds: list[int], class_names: list[str]) -> dict:
@@ -101,7 +116,27 @@ def main() -> None:
     parser.add_argument("--device", default="auto")
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument(
+        "--calibration-bins",
+        type=int,
+        default=10,
+        help="equal-width bins for expected calibration error",
+    )
+    parser.add_argument(
+        "--bootstrap-samples",
+        type=int,
+        default=2000,
+        help="percentile bootstrap resamples over the fixed test set",
+    )
     args = parser.parse_args()
+    if args.batch_size < 1:
+        parser.error("--batch-size must be at least 1")
+    if args.num_workers < 0:
+        parser.error("--num-workers must be zero or greater")
+    if args.calibration_bins < 1:
+        parser.error("--calibration-bins must be at least 1")
+    if args.bootstrap_samples < 1:
+        parser.error("--bootstrap-samples must be at least 1")
 
     device = resolve_device(args.device)
     checkpoint_path = resolve_project_path(args.checkpoint)
@@ -115,8 +150,16 @@ def main() -> None:
     loader = DataLoader(
         test_set, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers
     )
-    targets, preds = compute_predictions(model, loader, device)
+    targets, probabilities = compute_probabilities(model, loader, device)
+    preds = [max(range(len(row)), key=row.__getitem__) for row in probabilities]
     result = build_metrics(targets, preds, checkpoint["classes"])
+    result["reliability"] = summarize_reliability(
+        probabilities,
+        targets,
+        num_classes=len(checkpoint["classes"]),
+        n_bins=args.calibration_bins,
+        n_boot=args.bootstrap_samples,
+    )
     result["checkpoint"] = str(checkpoint_path)
     result["manifest"] = str(manifest_path)
     result["manifest_sha256"] = manifest_sha256
@@ -147,6 +190,11 @@ def main() -> None:
     print(
         f"[{result['experiment']}] test accuracy={result['accuracy']:.4f} "
         f"macro_f1={result['macro_f1']:.4f} n={result['num_samples']}"
+    )
+    print(
+        f"[{result['experiment']}] reliability ece={result['reliability']['calibration']['ece']:.4f} "
+        f"brier={result['reliability']['brier_score']:.4f} "
+        f"nll={result['reliability']['negative_log_likelihood']:.4f}"
     )
     print(f"saved: {out_path}")
 

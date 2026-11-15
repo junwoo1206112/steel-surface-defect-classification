@@ -167,6 +167,7 @@ def test_zip_path_traversal_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="unsafe ZIP member path"):
         extract_archive(archive_path, tmp_path / "raw")
     assert not (tmp_path / "outside.txt").exists()
+    assert not (tmp_path / "raw" / "malicious").exists()
 
 
 def test_neu_contract_rejects_non_neu_fixture(synthetic_raw_dir: Path, tmp_path: Path) -> None:
@@ -197,6 +198,32 @@ def test_preparation_rejects_rar_inputs(tmp_path: Path, monkeypatch: pytest.Monk
     monkeypatch.setattr(paths, "RAW_DATA_ROOT", tmp_path)
     archive_path = tmp_path / "unsafe-input.rar"
     archive_path.write_bytes(b"not-a-rar")
+    out_dir = tmp_path / "processed"
     with pytest.raises(ValueError, match="RAR 입력"):
-        run_preparation(archive_path, tmp_path / "processed", 42, (0.7, 0.15, 0.15))
+        run_preparation(archive_path, out_dir, 42, (0.7, 0.15, 0.15))
+    assert not (out_dir / "manifest.csv").exists()
+
+
+def test_preparation_rejects_empty_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import defect_cls.paths as paths
+
+    monkeypatch.setattr(paths, "RAW_DATA_ROOT", tmp_path)
+    empty_dir = tmp_path / "empty"
+    empty_dir.mkdir()
+    with pytest.raises(ValueError, match="no supported image files"):
+        run_preparation(empty_dir, tmp_path / "processed", 42, (0.7, 0.15, 0.15))
+
+
+def test_preparation_rejects_unsupported_archive_before_writing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import defect_cls.paths as paths
+
+    monkeypatch.setattr(paths, "RAW_DATA_ROOT", tmp_path)
+    archive_path = tmp_path / "input.7z"
+    archive_path.write_bytes(b"not-a-7z")
+    out_dir = tmp_path / "processed"
+    with pytest.raises(ValueError, match="지원하지 않는 압축 형식"):
+        run_preparation(archive_path, out_dir, 42, (0.7, 0.15, 0.15))
+    assert not (out_dir / "manifest.csv").exists()
 

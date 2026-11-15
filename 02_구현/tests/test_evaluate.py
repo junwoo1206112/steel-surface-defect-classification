@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import pytest
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from defect_cls.evaluate import compute_predictions
+from defect_cls.evaluate import compute_predictions, compute_probabilities
 
 
 class EvalOnlyModel(torch.nn.Module):
@@ -28,3 +29,23 @@ def test_compute_predictions_switches_model_to_eval_mode() -> None:
     assert model.training is False
     assert targets == [0, 1]
     assert predictions == [0, 1]
+
+
+def test_compute_probabilities_returns_normalized_rows() -> None:
+    model = EvalOnlyModel()
+    loader = DataLoader(
+        TensorDataset(
+            torch.tensor([[1.0], [-1.0]]),
+            torch.tensor([0, 1]),
+        ),
+        batch_size=2,
+    )
+
+    targets, probabilities = compute_probabilities(model, loader, torch.device("cpu"))
+
+    assert targets == [0, 1]
+    assert len(probabilities) == 2
+    for row in probabilities:
+        assert len(row) == 2
+        assert sum(row) == pytest.approx(1.0)
+    assert probabilities[0][0] > probabilities[0][1]

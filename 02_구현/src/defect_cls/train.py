@@ -80,7 +80,7 @@ def check_training_output(out_dir: Path, overwrite: bool) -> None:
             "use --overwrite only after preserving or reviewing the prior run"
         )
 
-    parser = argparse.ArgumentParser(description="Train defect classification model")
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train defect classification model")
     parser.add_argument("--manifest", type=Path, default=PROCESSED_DATA_ROOT / "manifest.csv")
@@ -96,6 +96,16 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=ARTIFACTS_ROOT)
     parser.add_argument("--overwrite", action="store_true", help="replace existing checkpoint/history for this experiment and seed")
     args = parser.parse_args()
+    if args.epochs < 1:
+        parser.error("--epochs must be at least 1")
+    if args.batch_size < 1:
+        parser.error("--batch-size must be at least 1")
+    if args.lr <= 0:
+        parser.error("--lr must be greater than 0")
+    if args.weight_decay < 0:
+        parser.error("--weight-decay must be zero or greater")
+    if args.num_workers < 0:
+        parser.error("--num-workers must be zero or greater")
 
     augmented = args.experiment == "augmented"
     if args.experiment == "grayscale1ch" and args.input_channels != 1:

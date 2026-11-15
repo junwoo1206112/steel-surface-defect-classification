@@ -11,6 +11,7 @@ NEU-CLS.rar
 **/__pycache__/
 *.py[cod]
 .pytest_cache/
+02_구현/.venv/
 .streamlit/secrets.toml
 *.egg-info/
 

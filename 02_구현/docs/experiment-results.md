@@ -1,6 +1,6 @@
 # 실험 결과 리포트 (experiment-results)
 
-> 측정 일자: 2026-09-09 · 모든 수치는 이 저장소의 스크립트로 재현 가능하다. 추정 수치는 없다.
+> 측정 일자: 2026-09-09 · 회귀 검증: 2026-11-14(13절) · 모든 수치는 이 저장소의 스크립트로 재현 가능하다. 추정 수치는 없다.
 
 ## 1. 공통 실험 계약
 
@@ -78,7 +78,8 @@ val 270장 전수 신뢰도 스캔 (`scripts/confidence_scan.py`):
 
 ## 7. 테스트
 
-- 자동 테스트: 현재 코드 기준 전체 pytest **83개 통과**. 명령: `python -m pytest -q -p no:cacheprovider --basetemp="$env:TEMP\opencode\pytest-tmp"`
+- 자동 테스트: 2026-11-14 코드 기준 전체 pytest **128개 통과**. 명령: `python -m pytest -q -p no:cacheprovider --basetemp="$env:TEMP\opencode\pytest-tmp"`
+- 기존 문서의 **83개** 표기는 현재 테스트 파일 수(수정 전 90개)와 불일치했다. 2026-11-14 검증에서 수정 전 89 통과·1 실패(OpenCV 얇은 구조 마스크)를 확인해 결함을 고쳤고, 테스트 수를 실제 값으로 동기화했다. 이 실행은 CPU·합성 fixture 환경이며 실제 데이터/GPU 학습 수치를 새로 만들지 않았다.
 - 참고: Windows 기본 pytest 임시폴더(`%TEMP%\pytest-of-<user>`)에 권한 오류(WinError 5)가 발생하는 환경이므로 basetemp를 지정한다.
 - 커버: 클래스 파싱(약어 포함), NEU-CLS 입력 계약(1,800장·6×300·200×200) 강제, stratified 분할 비율·결정론·분리, 프로젝트 기준 manifest 경로, 업로드 파일·픽셀 제한, 안전 checkpoint 로드와 CPU smoke test, 동일 manifest SHA-256 기반 seed 결과 집계, 산출물 seed 분리, 지표 계약, 완전·근접 중복 검사, ZIP 경로 탈출 방지 등.
 
@@ -157,3 +158,32 @@ T별 플래그 비율(0.60 미만, val 270장):
 - **정직한 판정**: 이 게이트는 (1) clean 오경보 0.4%로 거의 없고, (2) 심한 노이즈는 사실상 전부 걸러낸다. 그러나 **블러는 이 지표로 전혀 분리되지 않는다** — NEU 표면 텍스처는 블러 후에도 라플라시안 분산이 높아 clean과 분포가 겹친다(후보 임계값에서 blur r1/r3 플래그가 clean과 동일한 수준). 선명도 플래그는 근거 없이 남겨두면 가짜 안전감만 주므로 비활성화했다.
 - 데모 연동: 품질 게이트 미달 시 예측을 표시하더라도 **확정하지 않고 '재검토 필요'로 강제 표시**한다(신뢰도 임계값과 독립 동작).
 - 남는 한계: 블러·미세 변형은 신뢰도(과신)와 품질 지표 모두를 통과한다. 이 입력군의 실질적 방어는 현재 없으며, 추가 연구 과제(주파수 영역 지표, 이상 탐지형 입력 검사)로 남긴다.
+
+## 12. 신뢰도·선택적 예측 평가 (2026-11-14 CUDA 실측)
+
+- 목적: 포화된 Accuracy·macro F1을 보완해 **확신의 정확성(calibration), 확률 품질, 보류 시 조건부 정확도, 표본 변동**을 같은 test set에서 기록한다.
+- 구현: `src/defect_cls/reliability.py` (PyTorch 비의존) + `evaluate.py`의 `compute_probabilities`/`reliability` 블록.
+- 지표: ECE/MCE(10구간 기본), 다중분류 Brier, NLL, top-3 accuracy, risk-coverage, accuracy·macro F1의 percentile bootstrap 95% 구간.
+- 실행: `python -m defect_cls.evaluate --checkpoint <ckpt> --device cuda` (기본 `--calibration-bins 10`, `--bootstrap-samples 2000`).
+- 산출 위치: `test-metrics.json`의 `reliability` 키. 기존 키와 혼동행렬 산출물은 변경하지 않는다.
+- **실행:** 공식 NEU-CLS 1,800장을 재검증해 중복 1장을 제외한 1,799장 manifest를 생성한 뒤, RTX 3070에서 baseline(seed=42, 20 epoch)을 학습하고 selected epoch 5 checkpoint로 test split 270장을 평가했다. checkpoint SHA-256은 `E8EA764B55366940A2C82D655CFFBF7F412C188FA1D67D0DCE5AE19C6F3E468A`, manifest SHA-256은 `3f579219ca729fc5cb6337b34a72e4e80b57e44ed683f3e5dbf9eaf547a2e69c`이다.
+- **결과:** accuracy/macro F1/top-3는 모두 1.0000, ECE(10 bins)는 **0.003993**, MCE는 0.357797, multiclass Brier는 **0.002065**, NLL은 **0.004671**이다. 2,000회 percentile bootstrap(고정 seed=42)의 accuracy·macro F1 95% 구간은 각각 **[1.0000, 1.0000]**이다.
+- **선택적 예측:** risk-coverage의 모든 보고 coverage(10/25/50/75/90/95/100%)에서 이 포화 test split의 selective accuracy는 1.0000, risk는 0.0이었다. 이는 보류 정책의 운영 안전성 증거가 아니라 쉬운 고정 benchmark에서 오류가 없었던 관측이다.
+- 해석 한계: ECE를 test set에서 계산하면 독립 캘리브레이션이 아니다. bootstrap은 고정 test set의 표본 변동만 나타내며 split·seed·도메인 변동이 아니다. risk-coverage는 운영 triage 성능이 아니다.
+- 상세 정의: `docs/reliability-evaluation.md`.
+
+## 13. 2026-11-14 회귀 검증과 발견 결함
+
+- 검증 환경: Python 3.12.10 임시 embeddable, torch 2.13.0(PyPI CPU wheel), torchvision 0.28.0, numpy 2.2.6, opencv 4.12.0.88, pillow 12.2.0, scikit-learn 1.9.0, pytest 8.4.2. CUDA·실데이터·checkpoint 없음.
+- 수정 전: **90개 수집, 89 통과, 1 실패.** 실패는 `preprocess_defect_candidates`의 3×3 opening이 1픽셀 얇은 선/원 경계를 전부 지워 마스크가 0이 되는 결함이었다. 문서의 83개 표기는 실제 수와 불일치했다.
+- 수정 후: **110 통과, 0 실패** (`python -m pytest -q -p no:cacheprovider --basetemp=...`, 최초 14.69s·재실행 8.95s). `compileall` 성공, `pip check` 정상, `pip install --dry-run -r requirements.txt` 해결 성공. 합성 12장·무작위 가중치 E2E `evaluate`도 exit 0으로 `reliability` 블록을 생성했다(성능 수치 아님).
+- 함께 수정: (1) requirements의 numpy 2.5.2 ↔ opencv 4.12(`numpy<2.3`) 충돌 → `numpy==2.2.6`, (2) RAR/미지원 압축의 manifest 작성 후 실패 → 사전 거부, (3) ZIP 검증 실패 시 빈 추출 디렉터리 잔존 → 정리, (4) 빈 디렉터리 → 빈 manifest 생성 방지, (5) train CLI 조기 검증·죽은 parser 제거.
+- **주의:** 위 110개는 1차 수정 시점의 합성 fixture·CPU 테스트다. 이후 인수인계 점검 테스트 8개를 추가해 전체 118개가 됐다. 실제 데이터 정확도·GPU 학습·벤치마크·Streamlit 부팅을 새로 측정한 결과가 아니다. 기존 1~11절의 실측 수치는 2026-09-09 기록을 그대로 보존한다.
+
+## 14. 인수인계 상태 점검 (2026-11-14)
+
+- `scripts/handoff_status.py`는 학습·평가·다운로드 없이 `data/raw` 이미지 수, manifest 행/누락 파일, checkpoint 수, 스크린샷 증빙, 폴더명, 문서 테스트 수를 읽고 다음 안전한 명령을 출력한다.
+- 현재 판정: 공식 원본 1,800장, manifest 1,799행, baseline seed-42 checkpoint와 `test-metrics.json`이 존재한다. `training`·`reliability_measurement`는 **done**이다.
+- 완료 판정: 데모 스크린샷(증빙 문서 + SHA-256 일치), 폴더명 `steel-surface-defect-classification`, 문서 테스트 수 118.
+- reliability 실측값은 위 CUDA 실행으로 기록했으며, 새 checkpoint·분할·환경으로 재실행할 때는 이 절에 별도 실행일·해시를 추가한다.
+- 검증: `tests/test_handoff.py` 10개, 전체 pytest **128 passed**.

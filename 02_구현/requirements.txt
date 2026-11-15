@@ -4,7 +4,8 @@ torchvision==0.28.0+cu126
 streamlit==1.63.0
 pandas==3.0.5
 matplotlib==3.11.1
-numpy==2.5.2
+numpy==2.2.6
 pillow==12.2.0
+opencv-python-headless==4.12.0.88
 scikit-learn==1.9.0
 pytest==8.4.2

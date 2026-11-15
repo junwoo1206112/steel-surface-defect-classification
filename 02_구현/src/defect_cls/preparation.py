@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import shutil
 import stat
 import zipfile
 from collections import Counter
@@ -16,6 +17,7 @@ from defect_cls.paths import RAW_DATA_ROOT, project_relative_path, require_raw_i
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp"}
 ARCHIVE_EXTENSIONS = {".zip"}
+REJECTED_ARCHIVE_EXTENSIONS = {".rar", ".7z", ".tar", ".gz", ".tgz", ".bz2", ".xz"}
 NEU_EXPECTED_TOTAL = 1800
 NEU_EXPECTED_PER_CLASS = 300
 NEU_EXPECTED_SIZE = (200, 200)
@@ -236,14 +238,19 @@ def extract_archive(input_path: Path, data_root: Path) -> Path:
     extract_dir = data_root / input_path.stem
     if extract_dir.exists():
         raise FileExistsError(f"extract dir already exists, remove it first: {extract_dir}")
-    extract_dir.mkdir(parents=True, exist_ok=True)
     suffix = input_path.suffix.lower()
-    if suffix == ".zip":
+    if suffix not in ARCHIVE_EXTENSIONS:
+        raise ValueError(f"unsupported archive type: {suffix}")
+    extract_dir.mkdir(parents=True, exist_ok=True)
+    try:
         with zipfile.ZipFile(input_path) as archive:
             validate_zip_members(archive, extract_dir)
             archive.extractall(extract_dir)
-    else:
-        raise ValueError(f"unsupported archive type: {suffix}")
+    except Exception:
+        # A rejected archive must not leave an empty directory that makes the
+        # next attempt fail with FileExistsError for the wrong reason.
+        shutil.rmtree(extract_dir, ignore_errors=True)
+        raise
     return extract_dir
 
 
@@ -256,12 +263,27 @@ def run_preparation(
 ) -> tuple[Path, Path, dict]:
     input_path = require_raw_input(input_path)
     data_root = RAW_DATA_ROOT
-    if input_path.suffix.lower() in ARCHIVE_EXTENSIONS:
+    suffix = input_path.suffix.lower()
+    if suffix == ".rar":
+        raise ValueError(
+            "RAR 입력은 안전하게 검증할 수 없어 지원하지 않는다. "
+            "신뢰할 수 있는 도구로 data/raw 아래에 먼저 해제한 디렉터리 또는 ZIP을 지정하라."
+        )
+    if suffix in REJECTED_ARCHIVE_EXTENSIONS:
+        raise ValueError(
+            f"지원하지 않는 압축 형식이다: {suffix}. "
+            "data/raw 아래에 먼저 해제한 디렉터리 또는 ZIP을 지정하라."
+        )
+    if suffix in ARCHIVE_EXTENSIONS:
         scan_root = extract_archive(input_path, data_root)
-    else:
+    elif input_path.is_dir():
         scan_root = input_path
+    else:
+        raise ValueError(f"input must be a directory or ZIP archive: {input_path}")
 
     files = collect_images(scan_root)
+    if not files:
+        raise ValueError(f"no supported image files found under {scan_root}")
     entries, anomalies = inspect_entries(files)
     contract_violations = validate_neu_contract(entries, anomalies)
     if enforce_neu_contract and contract_violations:
@@ -273,11 +295,6 @@ def run_preparation(
     manifest_path = out_dir / "manifest.csv"
     write_manifest(split_rows, manifest_path)
 
-    if input_path.suffix.lower() == ".rar":
-        raise ValueError(
-            "RAR 입력은 안전하게 검증할 수 없어 지원하지 않는다. "
-            "신뢰할 수 있는 도구로 data/raw 아래에 먼저 해제한 디렉터리 또는 ZIP을 지정하라."
-        )
     quality_path = out_dir / "data-quality.json"
     quality = {
         "input": project_relative_path(input_path),

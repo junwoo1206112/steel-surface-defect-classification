@@ -1,22 +1,19 @@
 from __future__ import annotations
 
-import io
 import streamlit as st
 import torch
-from PIL import Image
 
 from defect_cls import __version__
 from defect_cls.artifacts import discover_checkpoints
 from defect_cls.data import CLASSES
 from defect_cls.inference import (
     DEFAULT_THRESHOLD,
-    load_image_tensor,
     predict,
-    validate_upload,
 )
 from defect_cls.model import load_checkpoint
-from defect_cls.quality import assess_quality
 from defect_cls.paths import ARTIFACTS_ROOT, PROCESSED_DATA_ROOT
+from defect_cls.opencv_pipeline import preprocess_defect_candidates
+from defect_cls.upload_review import inspect_upload, review_decision
 
 ARTIFACTS_DIR = ARTIFACTS_ROOT
 SPLITS_DIR = PROCESSED_DATA_ROOT
@@ -88,40 +85,59 @@ uploaded = st.file_uploader(
 )
 
 if uploaded is not None:
-    ok, message = validate_upload(uploaded.name, uploaded.size)
-    if not ok:
-        st.error(f"업로드 거부: {message}")
-        st.stop()
     image_bytes = uploaded.getvalue()
     try:
-        tensor = load_image_tensor(image_bytes, image_mode=image_mode)
+        upload = inspect_upload(image_bytes, uploaded.name, image_mode=image_mode)
     except ValueError as exc:
         st.error(f"처리 실패: {exc}")
         st.stop()
 
-    quality = assess_quality(Image.open(io.BytesIO(image_bytes)))
+    # Keep the model tensor path unchanged. OpenCV is diagnostic/visualization only.
+    tensor = upload["tensor"]
+    bgr = upload["bgr"]
+    image_metadata = upload["metadata"]
+    legacy_quality = upload["legacy_quality"]
+    cv_quality = upload["cv_quality"]
+    previews = preprocess_defect_candidates(bgr)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_gpu = model.to(device)
     result = predict(model_gpu, tensor.to(device), threshold=threshold)
+    decision = review_decision(cv_quality, legacy_quality, result["needs_review"])
 
-    col_image, col_result = st.columns([1, 1.2])
-    with col_image:
-        st.image(image_bytes, caption=uploaded.name, use_container_width=True)
+    col_original, col_preprocessed, col_candidate = st.columns(3)
+    with col_original:
+        st.image(bgr[:, :, ::-1], caption=f"원본 · {image_metadata['width']}×{image_metadata['height']}", use_container_width=True)
+    with col_preprocessed:
+        st.image(previews["enhanced_gray"], caption="CLAHE 대비 향상", use_container_width=True, clamp=True)
+    with col_candidate:
+        st.image(
+            previews["candidate_overlay_bgr"][:, :, ::-1],
+            caption="전처리 기반 후보 강조 (모델의 위치 예측 아님)",
+            use_container_width=True,
+        )
+
+    col_result, col_quality = st.columns([1.1, 1])
     with col_result:
         st.metric("예측 클래스", result["class_label"])
         st.metric("신뢰도", f"{result['confidence'] * 100:.1f}%")
-        if not quality["passed"]:
-            flagged = [name for name, flagged_value in quality["flags"].items() if flagged_value]
+        if decision["status"] == "quality":
             st.warning(
                 "판단 보조 결과 — 재검토 필요\n\n입력 이미지 품질 게이트 미달 ("
-                + ", ".join(flagged)
-                + "). 측정 예측은 확정하지 않습니다."
+                + ", ".join(decision["flagged"])
+                + "). OpenCV 휴리스틱 경고이므로 예측을 확정하지 않습니다."
             )
-        elif result["needs_review"]:
+        elif decision["status"] == "confidence":
             st.warning("판단 보조 결과 — 재검토 필요\n\n신뢰도가 기준값보다 낮아 자동 확정하지 않습니다.")
         else:
             st.success("판단 보조 결과 — 기준 통과")
+    with col_quality:
+        st.subheader("OpenCV 입력 품질 진단")
+        st.caption("데모용 휴리스틱이며 운영 품질 기준이나 결함 판정이 아닙니다.")
+        st.metric("밝기", f"{cv_quality['brightness']:.1f}")
+        st.metric("대비", f"{cv_quality['contrast']:.1f}")
+        st.metric("선명도 (Laplacian 분산)", f"{cv_quality['sharpness']:.1f}")
+        st.metric("노이즈 추정 σ", f"{cv_quality['noise_sigma']:.1f}")
 
     st.subheader("클래스별 확률")
     probability_data = {
