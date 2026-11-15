@@ -34,6 +34,10 @@ def test_decode_rejects_invalid_uploads(filename: str, payload: bytes) -> None:
 
 def test_decode_rejects_pixel_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(pipeline, "MAX_UPLOAD_PIXELS", 100)
+    def _decode_must_not_run(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("픽셀 제한 초과 파일은 OpenCV 디코딩 전에 차단돼야 합니다.")
+
+    monkeypatch.setattr(pipeline.cv2, "imdecode", _decode_must_not_run)
     payload = _png_bytes(np.zeros((11, 10, 3), dtype=np.uint8))
     with pytest.raises(OpenCVValidationError, match="픽셀"):
         decode_and_validate_image(payload, "large.png")

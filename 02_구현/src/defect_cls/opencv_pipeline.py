@@ -7,10 +7,12 @@ tensor or produce a defect location prediction.
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 import cv2
 import numpy as np
+from PIL import Image, UnidentifiedImageError
 
 from defect_cls.inference import ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES, MAX_UPLOAD_PIXELS
 
@@ -30,7 +32,7 @@ DEFAULT_OPENCV_QUALITY_THRESHOLDS = {
 
 
 def decode_and_validate_image(image_bytes: bytes, filename: str) -> tuple[np.ndarray, dict]:
-    """Decode an upload with OpenCV and enforce format, size, and pixel limits."""
+    """Validate image headers before OpenCV allocation, then decode for diagnostics."""
     extension = Path(filename).suffix.lower()
     if extension not in ALLOWED_EXTENSIONS:
         raise OpenCVValidationError(
@@ -41,6 +43,22 @@ def decode_and_validate_image(image_bytes: bytes, filename: str) -> tuple[np.nda
     if len(image_bytes) > MAX_UPLOAD_BYTES:
         raise OpenCVValidationError(
             f"파일이 너무 큽니다: {len(image_bytes)} bytes (최대 {MAX_UPLOAD_BYTES} bytes)"
+        )
+
+    # PIL reads the container header without materializing decoded pixels.  Keep
+    # this gate ahead of cv2.imdecode so a highly-compressed image cannot force
+    # a large OpenCV allocation before the pixel ceiling is enforced.
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as header:
+            header_width, header_height = header.size
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise OpenCVValidationError("손상되었거나 이미지가 아닌 파일입니다.") from exc
+    if header_width <= 0 or header_height <= 0:
+        raise OpenCVValidationError("이미지 크기가 올바르지 않습니다.")
+    if header_width * header_height > MAX_UPLOAD_PIXELS:
+        raise OpenCVValidationError(
+            f"이미지 픽셀이 너무 많습니다: {header_width}x{header_height} "
+            f"(최대 {MAX_UPLOAD_PIXELS})"
         )
 
     encoded = np.frombuffer(image_bytes, dtype=np.uint8)
@@ -58,6 +76,8 @@ def decode_and_validate_image(image_bytes: bytes, filename: str) -> tuple[np.nda
         raise OpenCVValidationError(
             f"이미지 픽셀이 너무 많습니다: {width}x{height} (최대 {MAX_UPLOAD_PIXELS})"
         )
+    if (width, height) != (header_width, header_height):
+        raise OpenCVValidationError("이미지 헤더와 디코딩 크기가 일치하지 않습니다.")
     return bgr, {"width": width, "height": height, "channels": int(bgr.shape[2]), "extension": extension}
 
 
